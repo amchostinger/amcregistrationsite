@@ -1,0 +1,32 @@
+# Dependencies
+node_modules/
+
+# Secrets — NEVER commit. Use .env.example as the template.
+.env
+.env.local
+.env.*.local
+
+# Build output
+client/dist/
+dist/
+build/
+
+# Runtime uploads (speaker photos live on the server, not in git)
+server/uploads/*
+!server/uploads/.gitkeep
+
+# Database backups
+backups/
+
+# Logs
+*.log
+npm-debug.log*
+logs/
+
+# Editor / OS
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
