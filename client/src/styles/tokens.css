@@ -1,0 +1,37 @@
+/* src/styles/tokens.css — AMC 2027 Design Tokens */
+
+:root {
+  --color-navy:        #1a2f4e;
+  --color-navy-light:  #243d66;
+  --color-navy-deep:   #0f1e33;
+  --color-gold:        #c9a84c;
+  --color-gold-light:  #e8c97a;
+  --color-gold-deep:   #a8882a;
+  --color-cream:       #faf7f2;
+  --color-cream-dark:  #f0ebe0;
+  --color-charcoal:    #1c1c1c;
+  --color-muted:       #6b7280;
+  --color-white:       #ffffff;
+  --color-success:     #059669;
+  --color-error:       #dc2626;
+
+  --gold-gradient: linear-gradient(135deg, #c9a84c 0%, #e8c97a 50%, #c9a84c 100%);
+  --navy-gradient: linear-gradient(160deg, #0f1e33 0%, #1a2f4e 50%, #243d66 100%);
+  --hero-overlay:  linear-gradient(to bottom, rgba(10,20,40,0.72) 0%, rgba(15,25,50,0.88) 100%);
+
+  --font-display: 'Cinzel', serif;
+  --font-serif:   'Cormorant Garamond', Georgia, serif;
+  --font-body:    'Jost', system-ui, sans-serif;
+
+  --radius-sm:   8px;
+  --radius-card: 16px;
+  --radius-lg:   24px;
+  --shadow-xs:   0 1px 4px rgba(0,0,0,0.06);
+  --shadow-card: 0 4px 20px rgba(0,0,0,0.08);
+  --shadow-card-hover: 0 12px 40px rgba(0,0,0,0.16);
+  --shadow-xl:   0 24px 60px rgba(0,0,0,0.22);
+
+  --transition-fast: 150ms ease;
+  --transition-base: 250ms ease;
+  --transition-slow: 400ms ease;
+}

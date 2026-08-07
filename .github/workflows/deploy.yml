@@ -1,0 +1,61 @@
+name: Build & Deploy to DigitalOcean
+
+# Runs on every push to main, and can be triggered by hand from the
+# Actions tab (Run workflow).
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  # ── 1. Verify the code builds before touching the server ────────────────
+  build:
+    name: Build check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install server dependencies
+        working-directory: ./server
+        run: npm ci --omit=dev
+
+      - name: Install client dependencies
+        working-directory: ./client
+        run: npm ci
+
+      - name: Build client
+        working-directory: ./client
+        env:
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+        run: npm run build
+
+  # ── 2. Deploy: SSH into the droplet and run the deploy script ───────────
+  deploy:
+    name: Deploy to droplet
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: SSH deploy
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DO_HOST }}
+          username: ${{ secrets.DO_USER }}
+          # Key-based auth is used when DO_SSH_KEY is set; otherwise the
+          # password secret is used. Set only ONE of the two.
+          key: ${{ secrets.DO_SSH_KEY }}
+          password: ${{ secrets.DO_PASSWORD }}
+          port: ${{ secrets.DO_PORT }}
+          script_stop: true
+          command_timeout: 20m
+          script: |
+            set -e
+            cd /var/www/amc
+            ./deploy.sh

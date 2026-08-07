@@ -1,0 +1,269 @@
+﻿/* index.css - Global base styles */
+
+@import './styles/tokens.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* --- Base ------------------------------------------------------- */
+@layer base {
+  html { @apply scroll-smooth; }
+
+  body {
+    font-family: var(--font-body);
+    background-color: var(--color-cream);
+    color: var(--color-charcoal);
+    @apply antialiased;
+  }
+
+  h1, h2, h3 { font-family: var(--font-display); letter-spacing: 0.04em; }
+  h4, h5, h6  { font-family: var(--font-serif); }
+
+  h1 { @apply text-5xl font-bold leading-tight; }
+  h2 { @apply text-3xl font-semibold leading-snug; }
+  h3 { @apply text-2xl font-semibold; }
+  h4 { @apply text-xl font-semibold; }
+
+  * { @apply box-border; }
+  ::selection { background: rgba(201,168,76,0.3); }
+}
+
+/* --- Components ------------------------------------------------- */
+@layer components {
+
+  /* Buttons */
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2
+           bg-navy text-white font-body font-semibold px-7 py-3 rounded-xl
+           hover:bg-navy-light transition-all duration-200
+           focus:outline-none focus:ring-2 focus:ring-navy focus:ring-offset-2
+           disabled:opacity-50 disabled:cursor-not-allowed
+           shadow-md hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0;
+  }
+
+  .btn-gold {
+    @apply inline-flex items-center justify-center gap-2
+           bg-gold text-navy font-body font-bold px-7 py-3 rounded-xl
+           hover:bg-gold-light transition-all duration-200
+           focus:outline-none focus:ring-2 focus:ring-gold focus:ring-offset-2
+           disabled:opacity-50 disabled:cursor-not-allowed
+           shadow-md hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0;
+  }
+
+  .btn-outline {
+    @apply inline-flex items-center justify-center gap-2
+           border-2 border-navy text-navy font-body font-semibold px-7 py-3 rounded-xl
+           hover:bg-navy hover:text-white transition-all duration-200
+           focus:outline-none focus:ring-2 focus:ring-navy focus:ring-offset-2;
+  }
+
+  .btn-outline-gold {
+    @apply inline-flex items-center justify-center gap-2
+           border-2 border-gold text-gold font-body font-semibold px-7 py-3 rounded-xl
+           hover:bg-gold hover:text-navy transition-all duration-200
+           focus:outline-none focus:ring-2 focus:ring-gold focus:ring-offset-2;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2
+           text-navy/70 font-body font-semibold px-5 py-2.5 rounded-xl
+           hover:bg-navy/5 hover:text-navy transition-all duration-200;
+  }
+
+  /* Forms */
+  .form-input {
+    @apply w-full border border-gray-200 rounded-xl px-4 py-3
+           text-charcoal font-body text-sm bg-white
+           focus:outline-none focus:ring-2 focus:ring-gold/50 focus:border-gold
+           transition-all duration-150 placeholder-gray-400;
+    box-shadow: var(--shadow-xs);
+  }
+
+  .form-input:hover {
+    @apply border-gray-300;
+  }
+
+  .form-label {
+    @apply block text-sm font-semibold text-navy mb-1.5 font-body;
+  }
+
+  .form-error {
+    @apply text-red-600 text-xs mt-1.5 font-body;
+  }
+
+  /* Cards */
+  .card {
+    @apply bg-white rounded-2xl p-6 transition-all duration-300;
+    border: 1px solid rgba(232,224,208,0.8);
+    box-shadow: var(--shadow-card);
+  }
+
+  .card-hover {
+    @apply card cursor-pointer;
+  }
+
+  .card-hover:hover {
+    box-shadow: var(--shadow-card-hover);
+    transform: translateY(-4px);
+    border-color: rgba(201,168,76,0.35);
+  }
+
+  /* Glass card */
+  .glass-card {
+    @apply rounded-2xl backdrop-blur-md;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.15);
+  }
+
+  /* Layout */
+  .section-container {
+    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+  }
+
+  /* Section headings */
+  .section-heading {
+    font-family: var(--font-display);
+    @apply text-3xl lg:text-4xl font-bold text-navy text-center uppercase tracking-widest;
+  }
+
+  .section-label {
+    @apply block text-xs font-body font-bold uppercase tracking-[0.3em] mb-3;
+    color: var(--color-gold);
+  }
+
+  /* Gold divider */
+  .gold-rule {
+    @apply block mx-auto mt-4 mb-6 rounded-full;
+    width: 48px;
+    height: 3px;
+    background: var(--gold-gradient);
+  }
+
+  /* Badge */
+  .badge {
+    @apply inline-flex items-center gap-1.5 text-xs font-body font-semibold
+           uppercase tracking-widest px-3 py-1 rounded-full;
+  }
+
+  .badge-gold {
+    @apply badge;
+    background: rgba(201,168,76,0.18);
+    color: var(--color-gold);
+    border: 1px solid rgba(201,168,76,0.35);
+  }
+
+  .badge-navy {
+    @apply badge;
+    background: rgba(26,47,78,0.1);
+    color: var(--color-navy);
+    border: 1px solid rgba(26,47,78,0.2);
+  }
+
+  .badge-success {
+    @apply badge;
+    background: rgba(5,150,105,0.1);
+    color: #059669;
+    border: 1px solid rgba(5,150,105,0.25);
+  }
+
+  /* ── Rich text (speaker bios) ───────────────────────────────────────────
+     One shared set of rules so the admin editor and the public page render
+     saved formatting identically. */
+  .rich-text {
+    font-family: var(--font-body);
+    text-align: justify;
+    hyphens: auto;
+    @apply text-sm leading-relaxed;
+    color: var(--color-charcoal);
+  }
+  .rich-text > :first-child { margin-top: 0; }
+  .rich-text > :last-child  { margin-bottom: 0; }
+  .rich-text p { @apply mb-3; }
+  .rich-text strong, .rich-text b { @apply font-bold; color: var(--color-navy); }
+  .rich-text em, .rich-text i { @apply italic; }
+  .rich-text u { text-decoration: underline; }
+  .rich-text s { text-decoration: line-through; }
+  .rich-text ul, .rich-text ol { @apply mb-3 pl-6 space-y-1; text-align: left; }
+  .rich-text ul { list-style: disc; }
+  .rich-text ol { list-style: decimal; }
+  .rich-text li { @apply leading-relaxed; }
+  .rich-text li::marker { color: var(--color-gold); }
+  .rich-text h3, .rich-text h4 {
+    font-family: var(--font-display);
+    color: var(--color-navy);
+    text-align: left;
+    @apply font-bold mt-4 mb-2;
+  }
+  .rich-text h3 { @apply text-base; }
+  .rich-text h4 { @apply text-sm uppercase tracking-wide; }
+  .rich-text blockquote {
+    @apply pl-4 my-3 italic;
+    border-left: 3px solid var(--color-gold);
+    color: var(--color-muted);
+    text-align: left;
+  }
+  .rich-text a { color: var(--color-gold); text-decoration: underline; }
+  .rich-text a:hover { color: var(--color-navy); }
+
+  /* Rich text editor chrome */
+  .rich-editor {
+    @apply rounded-xl border border-gray-200 bg-white overflow-hidden;
+    box-shadow: var(--shadow-xs);
+  }
+  .rich-editor:focus-within { @apply border-gold ring-2 ring-gold/50; }
+  .rich-editor-toolbar {
+    @apply flex flex-wrap items-center gap-0.5 px-2 py-1.5 border-b border-gray-200;
+    background: var(--color-cream-dark);
+  }
+  .rich-editor-btn {
+    @apply w-7 h-7 flex items-center justify-center rounded-md text-navy/70
+           hover:bg-white hover:text-navy transition-colors;
+  }
+  .rich-editor-sep { @apply w-px h-4 mx-1 bg-gray-300; }
+  .rich-editor-surface {
+    @apply px-4 py-3 outline-none overflow-y-auto;
+    max-height: 20rem;
+  }
+  .rich-editor-placeholder {
+    @apply absolute left-4 top-3 text-sm text-gray-400 font-body pointer-events-none;
+  }
+  .rich-editor-hint {
+    @apply px-4 py-2 text-[11px] font-body border-t border-gray-100 text-gray-400;
+  }
+
+  /* Animate fade-up */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes floatSlow {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-8px); }
+  }
+  @keyframes marquee {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+  }
+  .animate-fade-up {
+    animation: fadeUp 0.6s ease forwards;
+  }
+  .animate-float {
+    animation: floatSlow 3.2s ease-in-out infinite;
+  }
+  .marquee-track {
+    animation: marquee 18s linear infinite;
+    will-change: transform;
+  }
+  .marquee-track:hover {
+    animation-play-state: paused;
+  }
+
+  /* Scrollbar styling */
+  .scrollbar-thin::-webkit-scrollbar { width: 4px; height: 4px; }
+  .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: rgba(201,168,76,0.4);
+    border-radius: 99px;
+  }
+}

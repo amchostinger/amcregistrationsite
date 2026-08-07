@@ -1,0 +1,1059 @@
+================================================================================
+        AMC 2027 CONFERENCE REGISTRATION SITE — DEPLOYMENT GUIDE
+        DigitalOcean (frontend + backend + MySQL)
+        Hostinger (domain / DNS)
+        GitHub Actions (CI/CD)  ·  VS Code Remote-SSH (two developers)
+================================================================================
+
+Prepared: 7 August 2026
+Applies to: AMCRegistrationSite (React + Vite client, Express + MySQL server)
+
+--------------------------------------------------------------------------------
+HOW TO USE THIS DOCUMENT
+--------------------------------------------------------------------------------
+Work through PART 1 to PART 9 in order the first time. After that you will
+almost never touch the server again — you just push to GitHub and the site
+updates itself (PART 7).
+
+PART  0 — What we are building (architecture)
+PART  1 — Prepare the GitHub repository
+PART  2 — Create the DigitalOcean droplet
+PART  3 — First login, root password, and securing the server
+PART  4 — Install the software stack (Node, MySQL, Nginx, PM2)
+PART  5 — Deploy the application for the first time
+PART  6 — Point the Hostinger domain at the droplet + enable HTTPS
+PART  7 — Set up the CI/CD pipeline (GitHub Actions)
+PART  8 — Connect VS Code over SSH (both computers)
+PART  9 — Day-to-day operations, backups and troubleshooting
+APPENDIX A — Admin accounts
+APPENDIX B — Quick command reference
+APPENDIX C — Go-live checklist
+
+
+================================================================================
+PART 0 — WHAT WE ARE BUILDING
+================================================================================
+
+Everything runs on ONE DigitalOcean droplet. Nginx sits at the front and
+decides where each request goes:
+
+    Browser
+      |
+      |  https://africamethodistcouncil.org
+      v
+   +--------------------------------------------------+
+   |  DigitalOcean Droplet (Ubuntu 22.04)             |
+   |                                                  |
+   |  NGINX  (ports 80 / 443, SSL via Let's Encrypt)  |
+   |    |                                             |
+   |    +-- /            -> /var/www/amc/client/dist  |  (React build)
+   |    +-- /api/...     -> http://127.0.0.1:5000     |  (Express API)
+   |    +-- /uploads/... -> http://127.0.0.1:5000     |  (speaker photos)
+   |                                                  |
+   |  PM2 -> node server/app.js  (port 5000)          |
+   |  MySQL 8  (localhost only, database amc_conference_2027)
+   +--------------------------------------------------+
+
+WHY ONE DOMAIN, NO SEPARATE API SUBDOMAIN?
+Because the frontend calls the API on the same origin (/api), you get:
+  * no CORS problems ever
+  * one SSL certificate instead of two
+  * VITE_API_URL is simply "/api"
+
+(If you later want api.africamethodistcouncil.org instead, see PART 6, Note B.)
+
+WHAT LIVES ONLY ON THE SERVER AND IS NEVER IN GITHUB
+  * .env            — all passwords and API keys
+  * server/uploads/ — speaker photos uploaded through the admin panel
+  * the MySQL database
+These are protected by .gitignore. Never remove those lines.
+
+
+================================================================================
+PART 1 — PREPARE THE GITHUB REPOSITORY
+================================================================================
+
+1.1  CREATE THE REPOSITORY
+     - Go to https://github.com/new
+     - Owner: your account (or better, a new Organisation, e.g. "kcmedia-zim",
+       so both of you own it and nobody loses access)
+     - Repository name: amc-registration-site
+     - Visibility: PRIVATE  (important — this is a live payment system)
+     - Do NOT tick "Add a README" (the project already has one)
+     - Click "Create repository"
+
+1.2  PUSH THE EXISTING CODE (from your Windows machine)
+     Open the project folder in VS Code, then open the terminal
+     (Terminal > New Terminal) and run:
+
+         git init
+         git branch -M main
+         git add .
+         git commit -m "Initial commit - AMC 2027 registration site"
+         git remote add origin https://github.com/<OWNER>/amc-registration-site.git
+         git push -u origin main
+
+     IMPORTANT — before the very first `git add .`, confirm .env is ignored:
+
+         git status --short | findstr ".env"
+
+     You should see NOTHING (or only .env.example). If you see ".env" itself,
+     stop and check that the .gitignore file exists in the project root.
+
+     If you have already pushed .env by mistake, treat every password and API
+     key in it as compromised: rotate the Paynow keys, the Resend key, the
+     MySQL password and the JWT secret before going live.
+
+1.3  GIVE YOUR COLLEAGUE ACCESS
+     Repository > Settings > Collaborators and teams > Add people
+     - Enter their GitHub username or email
+     - Role: Write   (they can push branches and merge PRs, but cannot delete
+       the repository)
+     They will get an email invitation they must accept.
+
+1.4  PROTECT THE MAIN BRANCH (strongly recommended)
+     Because a push to `main` deploys straight to the live site, add a guard:
+     Settings > Branches > Add branch protection rule
+       - Branch name pattern:  main
+       - [x] Require a pull request before merging
+       - [x] Require status checks to pass  ->  select "Build check"
+     Now nobody can accidentally break production with a single push; changes
+     go through a Pull Request that must build successfully first.
+
+1.5  HOW YOUR COLLEAGUE GETS THE CODE (on their computer)
+         git clone https://github.com/<OWNER>/amc-registration-site.git
+         cd amc-registration-site
+         cd server && npm install && cd ..
+         cd client && npm install && cd ..
+     Then they copy .env.example to .env and fill in their own LOCAL database
+     details. They must NEVER copy the production .env onto a laptop.
+
+     GitHub no longer accepts account passwords over HTTPS. Each developer
+     needs a Personal Access Token:
+       GitHub > Settings > Developer settings > Personal access tokens >
+       Tokens (classic) > Generate new token
+         - Note: "amc laptop"
+         - Expiration: 90 days
+         - Scope: [x] repo
+       Copy the token. When git asks for a password, paste the token instead.
+     VS Code's built-in "Sign in to GitHub" button handles this automatically
+     and is easier — use it if you can.
+
+
+================================================================================
+PART 2 — CREATE THE DIGITALOCEAN DROPLET
+================================================================================
+
+2.1  Log in at https://cloud.digitalocean.com  >  Create  >  Droplets
+
+2.2  CHOOSE THE OPTIONS
+     Region ................ Frankfurt or Amsterdam
+                             (closest DigitalOcean region to Southern Africa
+                             with good routing; London also fine)
+     Image ................. Ubuntu 22.04 (LTS) x64
+     Droplet type .......... Basic  >  Regular (SSD)
+     Size .................. 2 GB RAM / 1 vCPU / 50 GB SSD  —  $12/month
+                             (1 GB works but MySQL + a Vite build together
+                             will run out of memory. Take the 2 GB.)
+     Authentication ........ See 2.3 below
+     Hostname .............. amc-conference
+
+     Extras worth ticking:
+       [x] Enable backups (+20% — automatic weekly snapshots, worth it for a
+           live registration system)
+       [x] Add improved metrics monitoring
+
+2.3  AUTHENTICATION — READ THIS CAREFULLY
+     DigitalOcean offers "SSH Key" or "Password".
+
+     You asked for a root PASSWORD so that your colleague can also connect.
+     That works, and this guide supports it. Choose "Password" and set a
+     strong root password (20+ characters, store it in a password manager
+     such as Bitwarden — NOT in WhatsApp, not in the repository).
+
+     Be aware of the trade-off: a droplet with password root login gets
+     thousands of automated login attempts per day from bots on the public
+     internet. If the password is guessed, they own your server and your
+     registrants' data. So if you use a password, you MUST also do step 3.4
+     (install fail2ban) — it is three commands and it blocks those bots.
+
+     THE SAFER SETUP, WHICH STILL LETS BOTH OF YOU IN:
+     Choose "SSH Key" and upload BOTH of your public keys (yours and your
+     colleague's — see step 8.1 for how to generate one). Both of you then log
+     in as root with no password at all, and password guessing is impossible.
+     You can add or remove a person later by editing one file.
+
+     Either way the rest of this guide is identical. Where the guide needs the
+     choice, it says so.
+
+2.4  Click "Create Droplet". After ~60 seconds you get an IP address, e.g.
+     164.92.11.23. Write it down — it appears many times below. Everywhere
+     this guide says <DROPLET_IP>, use that number.
+
+2.5  RESERVE THE IP (recommended)
+     Networking > Reserved IPs > assign one to the droplet. This means if you
+     ever rebuild the server you keep the same IP and do not have to touch
+     Hostinger DNS again.
+
+
+================================================================================
+PART 3 — FIRST LOGIN AND SECURING THE SERVER
+================================================================================
+
+3.1  CONNECT FOR THE FIRST TIME
+     On Windows, open PowerShell (or the VS Code terminal) and run:
+
+         ssh root@<DROPLET_IP>
+
+     Type "yes" when asked about the host authenticity, then enter the root
+     password you set (or you go straight in, if you used SSH keys).
+     If you used a password, DigitalOcean forces you to change it on first
+     login — set the new one and record it in your password manager.
+
+3.2  UPDATE EVERYTHING
+
+         apt update && apt upgrade -y
+
+     If it asks about restarting services, accept the defaults (Tab, Enter).
+
+3.3  SET THE TIMEZONE (so log timestamps make sense to you)
+
+         timedatectl set-timezone Africa/Harare
+
+3.4  INSTALL FAIL2BAN — MANDATORY IF YOU USE A ROOT PASSWORD
+     This bans any IP address that fails to log in 5 times.
+
+         apt install fail2ban -y
+         systemctl enable fail2ban
+         systemctl start fail2ban
+
+     Check it later with:  fail2ban-client status sshd
+
+3.5  TURN ON THE FIREWALL
+     Allow only SSH and web traffic:
+
+         ufw allow OpenSSH
+         ufw allow 'Nginx Full'
+         ufw --force enable
+         ufw status
+
+     Expected output: OpenSSH ALLOW, Nginx Full ALLOW. Note that MySQL
+     (3306) is deliberately NOT opened — the API talks to it over localhost,
+     and nobody on the internet should be able to reach your database.
+
+3.6  ADD A SECOND PERSON'S SSH KEY (do this instead of sharing a password)
+     Ask your colleague to send you the CONTENTS of their public key file
+     (see step 8.1 — it is one line starting with "ssh-ed25519" or "ssh-rsa";
+     it is safe to send over email/WhatsApp, it is the *public* half). Then:
+
+         nano /root/.ssh/authorized_keys
+
+     Paste their key on a NEW LINE at the end. Save with Ctrl+O, Enter,
+     then exit with Ctrl+X. They can now SSH in as root with no password.
+     To revoke their access later, delete that line.
+
+3.7  (OPTIONAL BUT BEST PRACTICE) TURN OFF PASSWORD LOGIN ONCE KEYS WORK
+     Only do this after you have BOTH confirmed you can log in with keys —
+     otherwise you will lock yourself out.
+
+         nano /etc/ssh/sshd_config
+     Set:
+         PermitRootLogin prohibit-password
+         PasswordAuthentication no
+     Save, then:
+         systemctl restart ssh
+
+
+================================================================================
+PART 4 — INSTALL THE SOFTWARE STACK
+================================================================================
+All commands in this part are run on the droplet, as root.
+
+4.1  NODE.JS 20 LTS
+
+         curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+         apt install -y nodejs
+         node -v      # expect v20.x
+         npm -v
+
+4.2  GIT, NGINX AND BUILD TOOLS
+
+         apt install -y git nginx build-essential
+
+4.3  MYSQL 8
+
+         apt install -y mysql-server
+         systemctl enable mysql
+         mysql_secure_installation
+
+     Answer the prompts:
+       Validate password component?  ........ y  (choose 2 = STRONG)
+       New root password ................... set a strong one, SAVE IT
+       Remove anonymous users? ............. y
+       Disallow root login remotely? ....... y
+       Remove test database? ............... y
+       Reload privilege tables? ............ y
+
+4.4  CREATE THE DATABASE AND AN APPLICATION USER
+     Do not let the app connect as MySQL root. Create a dedicated user:
+
+         mysql -u root -p
+
+     Then at the mysql> prompt (replace CHANGE_ME_STRONG_PASSWORD):
+
+         CREATE DATABASE amc_conference_2027
+           CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+         CREATE USER 'amcapp'@'localhost'
+           IDENTIFIED BY 'CHANGE_ME_STRONG_PASSWORD';
+         GRANT ALL PRIVILEGES ON amc_conference_2027.* TO 'amcapp'@'localhost';
+         FLUSH PRIVILEGES;
+         EXIT;
+
+     Record that password — it goes into .env as DB_PASSWORD.
+
+4.5  PM2 (keeps the API running and restarts it after a reboot)
+
+         npm install -g pm2
+
+
+================================================================================
+PART 5 — DEPLOY THE APPLICATION FOR THE FIRST TIME
+================================================================================
+
+5.1  CLONE THE REPOSITORY INTO /var/www/amc
+     Because the repository is private, the server needs its own read-only
+     "deploy key".
+
+     a) On the droplet, create a key with no passphrase:
+
+            ssh-keygen -t ed25519 -C "amc-droplet-deploy" -f /root/.ssh/id_ed25519 -N ""
+            cat /root/.ssh/id_ed25519.pub
+
+     b) Copy the line it prints. In GitHub go to:
+        your repository > Settings > Deploy keys > Add deploy key
+          - Title: amc-droplet
+          - Key: paste the line
+          - Allow write access: LEAVE UNTICKED (read-only is all we need)
+          - Add key
+
+     c) Back on the droplet, clone over SSH:
+
+            mkdir -p /var/www
+            cd /var/www
+            git clone git@github.com:<OWNER>/amc-registration-site.git amc
+            cd /var/www/amc
+
+        (Type "yes" at the host authenticity prompt.)
+
+5.2  CREATE THE PRODUCTION .env
+     This file exists ONLY on the server and is never committed.
+
+         cd /var/www/amc
+         cp .env.example .env
+         nano .env
+
+     Fill it in like this (replace the placeholders):
+
+         PORT=5000
+         NODE_ENV=production
+         CLIENT_URL=https://africamethodistcouncil.org
+
+         DB_HOST=localhost
+         DB_PORT=3306
+         DB_USER=amcapp
+         DB_PASSWORD=<the password from step 4.4>
+         DB_NAME=amc_conference_2027
+
+         # Long random string — generate with:  openssl rand -base64 48
+         JWT_SECRET=<paste the generated value>
+
+         PAYNOW_INTEGRATION_ID=<your live Paynow ID>
+         PAYNOW_INTEGRATION_KEY=<your live Paynow key>
+         PAYNOW_RESULT_URL=https://africamethodistcouncil.org/api/payments/paynow-result
+         PAYNOW_RETURN_URL=https://africamethodistcouncil.org/payment-status
+
+         RESEND_API_KEY=<your Resend key>
+         RESEND_FROM_EMAIL=conference@africamethodistcouncil.org
+         ADMIN_NOTIFICATION_EMAIL=gensec@africamethodistcouncil.org
+
+         # Frontend build: same-origin, so just /api
+         VITE_API_URL=/api
+
+     Lock the file down so only root can read it:
+
+         chmod 600 /var/www/amc/.env
+
+     NOTE ON JWT_SECRET: if you leave it unset the app falls back to a
+     built-in default string that is visible in the source code — anyone
+     could then forge an admin login token. Setting it is not optional.
+
+5.3  CREATE THE DATABASE TABLES
+     Run the migrations in numerical order:
+
+         cd /var/www/amc
+         for f in server/db/migrations/*.sql; do
+           echo "Running $f"
+           mysql -u amcapp -p amc_conference_2027 < "$f"
+         done
+
+     (It will ask for the amcapp password once per file. To avoid that, you
+     can temporarily use: mysql -u amcapp -p'YOURPASSWORD' ... )
+
+     Then load the reference content (speakers, programme, hotels):
+
+         mysql -u amcapp -p amc_conference_2027 < server/db/seeds/seed_conference_content.sql
+         mysql -u amcapp -p amc_conference_2027 < server/db/seeds/draft_programme_2027.sql
+
+5.4  CREATE THE ADMIN ACCOUNTS
+
+         cd /var/www/amc/server
+         npm ci --omit=dev
+         node scripts/seedAdmins.js
+
+     This creates all six AMC administrator accounts listed in APPENDIX A.
+     It is safe to re-run at any time — it resets those passwords to the
+     values in the script and leaves other accounts alone.
+
+     IMPORTANT: also remove the old default account, whose password
+     ("Admin@2027") is written in plain text in the repository:
+
+         mysql -u amcapp -p amc_conference_2027 \
+           -e "DELETE FROM admins WHERE email='admin@amc2027.org';"
+
+5.5  START THE API UNDER PM2
+
+         cd /var/www/amc/server
+         pm2 start app.js --name amc-api
+         pm2 save
+         pm2 startup systemd
+     The last command prints another command starting with "sudo env ...".
+     COPY THAT LINE AND RUN IT — that is what makes the API come back
+     automatically after a server reboot.
+
+     Check it is alive:
+
+         pm2 status
+         curl http://localhost:5000/api/health
+
+     You should see: {"status":"ok","service":"AMC 2027 Conference API",...}
+
+5.6  BUILD THE FRONTEND
+
+         cd /var/www/amc/client
+         npm ci
+         npm run build
+
+     This produces /var/www/amc/client/dist — the files Nginx will serve.
+
+5.7  PREPARE THE UPLOADS FOLDER (speaker photos)
+
+         mkdir -p /var/www/amc/server/uploads/speakers
+         chown -R root:www-data /var/www/amc/server/uploads
+         chmod -R 775 /var/www/amc/server/uploads
+
+     This folder is in .gitignore, so deploys never wipe the photos.
+
+5.8  CONFIGURE NGINX
+
+         nano /etc/nginx/sites-available/amc
+
+     Paste this whole block (change the domain names if yours differ):
+
+--------------------------------------------------------------------------------
+server {
+    listen 80;
+    listen [::]:80;
+    server_name africamethodistcouncil.org www.africamethodistcouncil.org;
+
+    root /var/www/amc/client/dist;
+    index index.html;
+
+    # Registrant CSV exports and speaker photos can be a few MB
+    client_max_body_size 10M;
+
+    # gzip
+    gzip on;
+    gzip_types text/css application/javascript application/json image/svg+xml;
+    gzip_min_length 1024;
+
+    # ---- API ----
+    location /api/ {
+        proxy_pass http://127.0.0.1:5000;
+        proxy_http_version 1.1;
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 120s;
+    }
+
+    # ---- Uploaded speaker photos ----
+    location /uploads/ {
+        proxy_pass http://127.0.0.1:5000;
+        proxy_set_header Host $host;
+        expires 30d;
+        access_log off;
+    }
+
+    # ---- Static assets from the Vite build (hashed filenames) ----
+    location /assets/ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+
+    # ---- React Router: every other path returns index.html ----
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
+--------------------------------------------------------------------------------
+
+     Enable the site and remove the default one:
+
+         ln -s /etc/nginx/sites-available/amc /etc/nginx/sites-enabled/amc
+         rm -f /etc/nginx/sites-enabled/default
+         nginx -t
+         systemctl reload nginx
+
+     `nginx -t` must say "syntax is ok" and "test is successful". If it does
+     not, re-read the file for a missing brace or semicolon.
+
+5.9  QUICK TEST BEFORE DNS
+     In a browser go to  http://<DROPLET_IP>  — the site should load.
+     (Images and API calls will work; only the domain name is missing.)
+
+
+================================================================================
+PART 6 — POINT THE HOSTINGER DOMAIN AT THE DROPLET, THEN ADD HTTPS
+================================================================================
+
+6.1  LOG IN TO HOSTINGER
+     https://hpanel.hostinger.com  >  Domains  >  africamethodistcouncil.org
+     >  DNS / Nameservers  >  DNS records
+
+6.2  DELETE CONFLICTING RECORDS
+     Look for existing A records with Name "@" and Name "www" (they usually
+     point at Hostinger's own hosting). Delete them, and delete any CNAME on
+     "www". Leave MX records alone — those are your EMAIL and deleting them
+     stops mail to @africamethodistcouncil.org.
+
+     >>> READ THAT AGAIN: DO NOT TOUCH MX OR TXT/SPF/DKIM RECORDS. <<<
+     Your admin logins are @africamethodistcouncil.org addresses and the
+     system sends confirmation emails from that domain.
+
+6.3  ADD THE TWO NEW RECORDS
+
+         Type: A     Name: @      Points to: <DROPLET_IP>     TTL: 3600
+         Type: A     Name: www    Points to: <DROPLET_IP>     TTL: 3600
+
+     Save. DNS usually updates within 5–30 minutes (Hostinger says up to 24h).
+
+6.4  CHECK PROPAGATION
+     From your Windows PowerShell:
+
+         nslookup africamethodistcouncil.org
+
+     When it returns <DROPLET_IP>, you are ready. You can also check
+     worldwide at https://dnschecker.org.
+
+6.5  INSTALL THE SSL CERTIFICATE (free, auto-renewing)
+     Only do this AFTER 6.4 shows the correct IP — Let's Encrypt verifies by
+     visiting your domain.
+
+         apt install -y certbot python3-certbot-nginx
+         certbot --nginx -d africamethodistcouncil.org -d www.africamethodistcouncil.org
+
+     Answer:
+       Email .................... gensec@africamethodistcouncil.org
+       Agree to terms ........... Y
+       Share email with EFF ..... N (your choice)
+       Redirect HTTP to HTTPS ... 2 (Redirect)  <-- choose this
+
+     Certbot rewrites the Nginx file for you and installs a renewal timer.
+     Verify the auto-renewal works:
+
+         certbot renew --dry-run
+
+6.6  CONFIRM
+     Visit https://africamethodistcouncil.org — padlock in the address bar,
+     registration form loads, admin login at /admin works.
+
+     NOTE A — If you serve the site from a subdomain instead (for example
+     conference.africamethodistcouncil.org), just use that name in the
+     Hostinger A record, in `server_name`, in the certbot -d flags, and in
+     CLIENT_URL / the Paynow URLs in .env.
+
+     NOTE B — If you insist on a separate API host (api.africamethodist
+     council.org), add a second A record and a second Nginx server block that
+     proxies everything to 127.0.0.1:5000, set VITE_API_URL to
+     https://api.africamethodistcouncil.org/api, and set CLIENT_URL to the
+     frontend domain so the CORS rule in server/app.js allows it. The
+     single-domain setup in this guide avoids all of that.
+
+6.7  UPDATE PAYNOW
+     Log in to your Paynow merchant account and set the integration URLs to:
+         Result URL: https://africamethodistcouncil.org/api/payments/paynow-result
+         Return URL: https://africamethodistcouncil.org/payment-status
+     They must match the values in .env exactly, or payments will not confirm.
+
+
+================================================================================
+PART 7 — SET UP THE CI/CD PIPELINE (GITHUB ACTIONS)
+================================================================================
+
+The repository already contains the pipeline:
+    .github/workflows/deploy.yml   — runs on GitHub when you push to main
+    deploy.sh                      — runs on the droplet and does the work
+
+WHAT HAPPENS WHEN YOU PUSH TO main:
+    1. GitHub checks out the code on a clean Ubuntu runner
+    2. It installs dependencies and runs `npm run build` on the client.
+       If the build fails, THE DEPLOY IS SKIPPED and the live site is
+       untouched. This is your safety net.
+    3. If the build passes, GitHub SSHes into the droplet and runs deploy.sh
+    4. deploy.sh pulls the code, reinstalls dependencies, rebuilds the
+       frontend, restarts the API with PM2 and reloads Nginx
+    5. The whole thing takes about 2–4 minutes
+
+7.1  MAKE deploy.sh EXECUTABLE ON THE SERVER (one time)
+
+         chmod +x /var/www/amc/deploy.sh
+
+     If git ever resets that bit, run it again.
+
+7.2  ADD THE REPOSITORY SECRETS
+     In GitHub: repository > Settings > Secrets and variables > Actions >
+     "New repository secret". Add these:
+
+     NAME              VALUE                                REQUIRED?
+     ---------------   -----------------------------------  --------------
+     DO_HOST           <DROPLET_IP>                         yes
+     DO_USER           root                                 yes
+     DO_PORT           22                                   yes
+     VITE_API_URL      /api                                 yes
+     DO_PASSWORD       your root password                   see 7.3
+     DO_SSH_KEY        a private key (whole file)           see 7.3
+
+7.3  CHOOSE HOW GITHUB AUTHENTICATES TO THE SERVER — SET ONE, NOT BOTH
+
+     OPTION 1 — PASSWORD (simplest; matches the root-password setup you asked
+     for). Add DO_PASSWORD with the root password. Do not add DO_SSH_KEY.
+
+     OPTION 2 — DEDICATED DEPLOY KEY (recommended). This gives GitHub its own
+     key that you can revoke without changing anyone's password.
+
+       On your Windows machine:
+           ssh-keygen -t ed25519 -C "github-actions-amc" -f $env:USERPROFILE\.ssh\amc_deploy -N '""'
+
+       Copy the PUBLIC key onto the droplet — run this ON THE DROPLET,
+       pasting the contents of amc_deploy.pub:
+           echo "ssh-ed25519 AAAA... github-actions-amc" >> /root/.ssh/authorized_keys
+
+       Then in GitHub add secret DO_SSH_KEY and paste the ENTIRE contents of
+       the PRIVATE file (C:\Users\<you>\.ssh\amc_deploy), including the
+       -----BEGIN OPENSSH PRIVATE KEY----- and -----END...----- lines.
+       Do not add DO_PASSWORD.
+
+     Secrets are write-only: once saved, not even you can read them back.
+     They are also masked in the workflow logs.
+
+7.4  RUN THE PIPELINE FOR THE FIRST TIME
+     GitHub > Actions tab > "Build & Deploy to DigitalOcean" > Run workflow >
+     branch: main > Run workflow.
+
+     Watch the two jobs. Green ticks on both = your pipeline works.
+     If "Deploy to droplet" fails, expand the failing step — the SSH error
+     message is usually exact ("Permission denied" = wrong secret;
+     "no such file" = deploy.sh path or chmod +x missing).
+
+7.5  THE NORMAL DEVELOPMENT WORKFLOW FROM NOW ON
+     Neither of you should edit files on the server. Both of you work
+     locally and let the pipeline deploy.
+
+         git checkout main
+         git pull                       # always start from the latest code
+         git checkout -b fix/speaker-photos
+         ...make your changes, test locally with `npm run dev`...
+         git add .
+         git commit -m "Describe what changed"
+         git push -u origin fix/speaker-photos
+
+     Then on GitHub: Compare & pull request > review > Merge.
+     The merge into main triggers the deploy automatically. Refresh the live
+     site 3 minutes later.
+
+7.6  AVOIDING CONFLICTS BETWEEN THE TWO OF YOU
+     * ALWAYS `git pull` before you start working. Most conflicts come from
+       working on a stale copy.
+     * One branch per task, and keep branches short-lived (a day or two).
+     * Agree on who owns which area — for example one person on the admin
+       panel, the other on the public pages — so you rarely touch the same
+       file at once.
+     * If git reports a conflict, VS Code shows "Accept Current / Accept
+       Incoming / Accept Both" buttons in the file. Read both sides, keep
+       what is correct, then commit.
+     * Never use `git push --force` on main.
+
+7.7  ROLLING BACK A BAD DEPLOY
+     If a release breaks the live site:
+
+         # find the last good commit
+         git log --oneline -10
+         git revert <bad-commit-sha>
+         git push
+
+     The revert is itself a push to main, so the pipeline redeploys the
+     working version. Nothing is lost from history.
+
+     For an emergency, you can also do it straight on the droplet:
+
+         cd /var/www/amc
+         git reset --hard <good-commit-sha>
+         ./deploy.sh
+
+     (Remember to revert properly in GitHub afterwards, or the next deploy
+     will bring the broken code straight back.)
+
+
+================================================================================
+PART 8 — CONNECT VS CODE OVER SSH (BOTH COMPUTERS)
+================================================================================
+
+This lets either of you open the server's files inside VS Code as if they
+were local, and gives you a real terminal on the server.
+
+8.1  GENERATE AN SSH KEY (each person, on their own computer)
+     Open PowerShell:
+
+         ssh-keygen -t ed25519 -C "your.name@africamethodistcouncil.org"
+
+     Press Enter three times (accept the default path, empty passphrase — or
+     set a passphrase for extra safety). This creates:
+         C:\Users\<you>\.ssh\id_ed25519       <-- PRIVATE. Never share this.
+         C:\Users\<you>\.ssh\id_ed25519.pub   <-- PUBLIC. Safe to share.
+
+     Show the public key so you can copy it:
+
+         type $env:USERPROFILE\.ssh\id_ed25519.pub
+
+     Send that one line to whoever administers the droplet; they add it using
+     step 3.6.
+
+8.2  INSTALL THE VS CODE EXTENSION
+     VS Code > Extensions (Ctrl+Shift+X) > search "Remote - SSH"
+     > install the one published by Microsoft.
+
+8.3  ADD THE SERVER TO YOUR SSH CONFIG
+     Press F1 > type "Remote-SSH: Open SSH Configuration File" > choose
+         C:\Users\<you>\.ssh\config
+     Add:
+
+         Host amc-production
+             HostName <DROPLET_IP>
+             User root
+             Port 22
+             IdentityFile ~/.ssh/id_ed25519
+             ServerAliveInterval 60
+
+     (If you are using a root password rather than a key, leave out the
+     IdentityFile line — VS Code will prompt for the password each time.)
+
+8.4  CONNECT
+     Press F1 > "Remote-SSH: Connect to Host..." > amc-production.
+     A new VS Code window opens. Bottom-left shows "SSH: amc-production".
+     Then File > Open Folder > /var/www/amc.
+
+     Terminal > New Terminal now gives you a shell ON THE SERVER, where you
+     can run pm2 logs, ./deploy.sh, mysql, and everything else in this guide.
+
+8.5  A RULE WORTH KEEPING
+     Use the VS Code SSH connection for INSPECTING and OPERATING the server
+     (logs, restarts, database, .env). Do not use it to edit application code
+     — code changes belong in GitHub, or your next deploy will silently
+     overwrite them (deploy.sh runs `git reset --hard`).
+
+     The two files you legitimately edit on the server are:
+         /var/www/amc/.env
+         /etc/nginx/sites-available/amc
+
+
+================================================================================
+PART 9 — OPERATIONS, BACKUPS AND TROUBLESHOOTING
+================================================================================
+
+9.1  EVERYDAY COMMANDS (on the droplet)
+
+     pm2 status                  # is the API running?
+     pm2 logs amc-api            # live API logs (Ctrl+C to exit)
+     pm2 logs amc-api --lines 200
+     pm2 restart amc-api         # restart after changing .env
+     pm2 monit                   # live CPU / memory
+
+     systemctl status nginx
+     nginx -t                    # check config before reloading
+     systemctl reload nginx
+
+     tail -f /var/log/nginx/error.log
+     tail -f /var/log/nginx/access.log
+
+     df -h                       # disk space (uploads grow over time)
+     free -m                     # memory
+
+9.2  AUTOMATIC DAILY DATABASE BACKUPS — SET THIS UP ON DAY ONE
+     Registration data is irreplaceable. Create the script:
+
+         nano /root/backup-amc.sh
+
+     Contents:
+
+         #!/bin/bash
+         set -e
+         BACKUP_DIR=/root/backups
+         mkdir -p "$BACKUP_DIR"
+         STAMP=$(date +%Y%m%d-%H%M%S)
+         mysqldump -u amcapp -p'YOUR_DB_PASSWORD' amc_conference_2027 \
+           | gzip > "$BACKUP_DIR/amc-$STAMP.sql.gz"
+         tar czf "$BACKUP_DIR/uploads-$STAMP.tar.gz" -C /var/www/amc/server uploads
+         # keep 30 days
+         find "$BACKUP_DIR" -name '*.gz' -mtime +30 -delete
+
+     Then:
+
+         chmod 700 /root/backup-amc.sh
+         crontab -e
+     Add this line (runs every night at 02:00):
+
+         0 2 * * * /root/backup-amc.sh >> /var/log/amc-backup.log 2>&1
+
+     Test it once by hand:  /root/backup-amc.sh && ls -la /root/backups
+
+     Also download a copy off the server periodically — a backup that only
+     exists on the machine that might die is not a backup. From your PC:
+
+         scp root@<DROPLET_IP>:/root/backups/amc-*.sql.gz .
+
+9.3  RESTORING A BACKUP
+
+         gunzip < /root/backups/amc-20270310-020000.sql.gz \
+           | mysql -u amcapp -p amc_conference_2027
+
+9.4  CLEARING TEST DATA BEFORE A FRESH START
+     The repository includes a safe reset script. It shows you what it will
+     delete before deleting anything:
+
+         cd /var/www/amc/server
+         node scripts/clearRegistrations.js          # dry run — just counts
+         node scripts/clearRegistrations.js --yes    # actually deletes
+
+     It clears registrants, payments, hotel_bookings and admin_audit_log and
+     resets the ID counters. Speakers, schedule, hotels, settings and admin
+     accounts are left alone. ALWAYS take a backup (9.2) first.
+
+9.5  MANAGING ADMIN ACCOUNTS
+
+     Add or change accounts: edit the ADMINS list in
+     server/scripts/seedAdmins.js, push it through the pipeline, then on the
+     server run:
+
+         cd /var/www/amc/server && node scripts/seedAdmins.js
+
+     Disable someone immediately without deleting their history:
+
+         mysql -u amcapp -p amc_conference_2027 \
+           -e "UPDATE admins SET is_active=0 WHERE email='someone@africamethodistcouncil.org';"
+
+     List all admins:
+
+         mysql -u amcapp -p amc_conference_2027 \
+           -e "SELECT id,name,email,is_active,last_login FROM admins;"
+
+9.6  TROUBLESHOOTING TABLE
+
+     SYMPTOM                          LIKELY CAUSE / FIX
+     ------------------------------   ---------------------------------------
+     502 Bad Gateway                  API is down. `pm2 status`, then
+                                      `pm2 logs amc-api` to see why. Usually
+                                      a bad .env value or MySQL not running.
+
+     Site loads but no data;          API unreachable from the browser. Check
+     console shows Network errors     VITE_API_URL was /api at build time, and
+                                      that the /api/ location block exists in
+                                      Nginx. Rebuild the client after changing
+                                      VITE_API_URL — it is baked in at build.
+
+     Blank white page                 The React build failed or dist is empty.
+                                      `ls /var/www/amc/client/dist`, then
+                                      rebuild: cd client && npm ci && npm run build
+
+     404 on refresh of /speakers      The `try_files ... /index.html` line is
+                                      missing from the Nginx `location /`.
+
+     Speaker photo uploads fail       Permissions. Run:
+                                      chown -R root:www-data /var/www/amc/server/uploads
+                                      chmod -R 775 /var/www/amc/server/uploads
+                                      Also check client_max_body_size 10M in Nginx.
+
+     Photos disappear after a deploy  server/uploads was committed to git or
+                                      removed from .gitignore. Restore from the
+                                      uploads-*.tar.gz backup and fix .gitignore.
+
+     Admin login says "Invalid        Re-run node scripts/seedAdmins.js. If it
+     email or password"               still fails, JWT_SECRET may be empty —
+                                      set it and `pm2 restart amc-api`.
+
+     Logged out every few minutes     JWT_SECRET changes on each restart
+                                      because it is not set in .env.
+
+     Payments never confirm           Paynow Result URL does not match
+                                      PAYNOW_RESULT_URL, or it is still http://
+                                      or still pointing at localhost.
+
+     Emails not arriving              Check RESEND_API_KEY and that the sending
+                                      domain is verified in Resend. Look at
+                                      `pm2 logs amc-api` for Resend errors.
+
+     GitHub Action "Permission        Wrong DO_PASSWORD / DO_SSH_KEY secret, or
+     denied (publickey,password)"     both are set. Set exactly one.
+
+     Deploy runs but site unchanged   Browser cache. Ctrl+F5. If it persists,
+                                      check the Action actually ran deploy.sh
+                                      and that `git reset --hard` picked up
+                                      your commit.
+
+     Server out of memory during      2 GB droplet minimum. As a stopgap add
+     `npm run build`                  swap:
+                                      fallocate -l 2G /swapfile && chmod 600 /swapfile
+                                      && mkswap /swapfile && swapon /swapfile
+                                      && echo '/swapfile none swap sw 0 0' >> /etc/fstab
+
+9.7  SECURITY MAINTENANCE
+     * `apt update && apt upgrade -y` monthly
+     * `fail2ban-client status sshd` occasionally — see who is being blocked
+     * Rotate admin passwords after the conference
+     * Never paste .env contents into WhatsApp, email or a GitHub issue
+     * Keep the repository PRIVATE
+     * Remove a departing collaborator from GitHub AND delete their line from
+       /root/.ssh/authorized_keys
+
+
+================================================================================
+APPENDIX A — ADMIN ACCOUNTS
+================================================================================
+
+Created by server/scripts/seedAdmins.js. Login page: /admin
+
+    communications@africamethodistcouncil.org   @communications!Afric@17
+    gensec@africamethodistcouncil.org           @gensec4Peace
+    info@africamethodistcouncil.org             @info!Africa17
+    amcyouth@africamethodistcouncil.org         @Young!Africa26
+    amcpresident@africamethodistcouncil.org     !Am@presidEnt192
+    amctreasurer@africamethodistcouncil.org     !Amc@Finance250
+
+All six accounts have identical, full administrator rights — the system has
+no role levels. Anyone who logs in can view every registrant's personal
+details, see payments and edit site content.
+
+TWO THINGS TO DO ABOUT THAT:
+  1. Delete the old default account admin@amc2027.org — its password
+     ("Admin@2027") is written in plain text in the repository and is
+     therefore public knowledge (step 5.4 shows the command).
+  2. "@gensec4Peace" is noticeably shorter and more guessable than the
+     others. Consider lengthening it before the site is publicly announced.
+
+Distribute these credentials one-to-one (password manager, or in person),
+never in a group chat. This file itself contains them, so do not email it
+around casually and do not commit it to a public repository.
+
+
+================================================================================
+APPENDIX B — QUICK COMMAND REFERENCE
+================================================================================
+
+ON YOUR WINDOWS PC
+    ssh root@<DROPLET_IP>                   connect to the server
+    git pull                                get the latest code
+    git checkout -b my-change               start a change
+    git add . && git commit -m "msg"        save it
+    git push -u origin my-change            send it to GitHub
+    cd client && npm run dev                run the site locally (port 5173)
+    cd server && npm run dev                run the API locally (port 5000)
+
+ON THE DROPLET
+    cd /var/www/amc && ./deploy.sh          deploy by hand
+    pm2 restart amc-api                     restart the API
+    pm2 logs amc-api                        watch the API logs
+    nginx -t && systemctl reload nginx      apply an Nginx change
+    node server/scripts/seedAdmins.js       re-create admin accounts
+    node server/scripts/clearRegistrations.js        dry-run reset
+    node server/scripts/clearRegistrations.js --yes  real reset
+    /root/backup-amc.sh                     back up now
+    mysql -u amcapp -p amc_conference_2027  open the database
+
+KEY PATHS ON THE DROPLET
+    /var/www/amc                    the application (git checkout)
+    /var/www/amc/.env               all secrets — never in git
+    /var/www/amc/client/dist        the built frontend Nginx serves
+    /var/www/amc/server/uploads     speaker photos — never in git
+    /etc/nginx/sites-available/amc  Nginx configuration
+    /root/backups                   database + uploads backups
+    ~/.pm2/logs/                    API log files
+
+
+================================================================================
+APPENDIX C — GO-LIVE CHECKLIST
+================================================================================
+
+INFRASTRUCTURE
+  [ ] Droplet created, 2 GB RAM, backups enabled
+  [ ] ufw enabled; only OpenSSH and Nginx Full allowed
+  [ ] fail2ban installed and running (essential if root password login)
+  [ ] Both developers can SSH in
+  [ ] Timezone set to Africa/Harare
+
+APPLICATION
+  [ ] .env complete on the server, chmod 600
+  [ ] JWT_SECRET set to a long random value (NOT the default)
+  [ ] NODE_ENV=production
+  [ ] CLIENT_URL is the https:// domain
+  [ ] All migrations run; seed content loaded
+  [ ] Six admin accounts created and each person has tested their login
+  [ ] admin@amc2027.org deleted
+  [ ] Registrations/payments cleared (already done on 7 Aug 2026)
+  [ ] server/uploads exists, owned by root:www-data, mode 775
+  [ ] PM2 running amc-api; `pm2 startup` command executed
+
+WEB
+  [ ] Hostinger A records @ and www point to the droplet
+  [ ] MX / SPF / DKIM records untouched — test that email still arrives
+  [ ] HTTPS certificate installed; http:// redirects to https://
+  [ ] certbot renew --dry-run passes
+  [ ] React Router deep links work (visit /speakers directly, then refresh)
+
+PAYMENTS AND EMAIL
+  [ ] Paynow switched from test to LIVE credentials
+  [ ] Paynow Result/Return URLs updated in both Paynow and .env
+  [ ] One real end-to-end test payment completed and confirmed
+  [ ] Resend domain verified; confirmation email received and looks right
+
+CI/CD
+  [ ] deploy.sh is executable on the server
+  [ ] GitHub secrets set (exactly one of DO_PASSWORD / DO_SSH_KEY)
+  [ ] Manual "Run workflow" completed green
+  [ ] main branch protected, "Build check" required
+  [ ] Colleague has accepted their repository invitation and can push
+
+BACKUPS
+  [ ] /root/backup-amc.sh created and tested
+  [ ] Cron entry at 02:00 daily
+  [ ] One backup successfully downloaded off the server
+
+FINAL PASS
+  [ ] Register as a test delegate end to end, then delete that record
+  [ ] Add a speaker with an uploaded photo and a formatted bio; check the
+      public page shows the bullets/bold and scrolls properly
+  [ ] Check the site on a phone
+  [ ] Footer reads "Made with ♥ by KC Media_Zim"
+
+================================================================================
+END OF GUIDE
+================================================================================
