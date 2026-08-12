@@ -393,7 +393,7 @@ router.put('/schedule/:id', async (req, res, next) => {
     const { session_date, start_time, end_time, title, room, type, description } = req.body;
     await query(
       `UPDATE schedule_sessions SET session_date=?, start_time=?, end_time=?, title=?, room=?, type=?, description=? WHERE id=?`,
-      [session_date, start_time, end_time || null, title, room || '', type || 'general', description || '', req.params.id]
+      [session_date || null, start_time || null, end_time || null, title || '', room || '', type || 'general', description || '', req.params.id]
     );
     res.json({ ok: true });
   } catch (err) { next(err); }
