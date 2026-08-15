@@ -50,7 +50,7 @@ const BANK_DETAILS = {
   bank:        'CBZ Bank Zimbabwe',
   branch:      'Samora Machel',
   account:     '5718000012056',
-  swift:       'COBZZWHAXXX',
+  swift:       'ECOCZWHXXXX',
   accountName: 'THE METHODIST CHURCH IN ZIMBABWE ',
 };
 

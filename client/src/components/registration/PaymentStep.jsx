@@ -17,7 +17,7 @@ const BANK_DETAILS = {
   bank:       'ECOBANK',
   branch:     'Samora Machel',
   account:    '5718000012056',
-  swift:      'COBZZWHAXXX',
+  swift:      'ECOCZWHXXXX',
   accountName:'THE METHODIST CHURCH IN ZIMBABWE ',
   reference:  'Use your Registration Ref as payment reference',
 };
@@ -26,7 +26,7 @@ const PAYMENT_METHODS = [
   {
     id: 'ecocash',
     label: 'EcoCash',
-    description: 'Mobile money — receive a USSD push prompt',
+    description: 'Mobile money — pay securely via Paynow',
     icon: (
       <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
         <rect x="5" y="2" width="14" height="20" rx="2"/>
@@ -79,10 +79,6 @@ export default function PaymentStep({ formData, registrationRef, onInitiate, onB
     : `Registration fee (${category}) × ${people} person${people !== 1 ? 's' : ''}`;
 
   const handlePay = async () => {
-    if (method === 'ecocash' && !mobilePhone.trim()) {
-      toast.error('Please enter your EcoCash mobile number.');
-      return;
-    }
     try {
       const result = await onInitiate({ paymentMethod: method, mobilePhone });
       if (method === 'bank') {
@@ -175,30 +171,23 @@ export default function PaymentStep({ formData, registrationRef, onInitiate, onB
       </div>
 
       {/* ── EcoCash Flow ─────────────────────────────────────────── */}
+      {/* Handled on Paynow's hosted page, exactly like the card flow — the
+          subscriber enters their own number and approves there. */}
       {method === 'ecocash' && (
         <div className="rounded-xl border p-5 space-y-4" style={{ borderColor: '#e5e7eb', background: '#fafafa' }}>
           <div className="flex items-start gap-3">
             <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-bold text-white" style={{ background: 'var(--color-navy)' }}>1</div>
             <div>
-              <p className="font-body font-semibold text-sm" style={{ color: 'var(--color-navy)' }}>Enter your EcoCash number</p>
-              <p className="font-body text-xs mt-0.5" style={{ color: 'var(--color-muted)' }}>You will receive a USSD prompt to approve the payment.</p>
+              <p className="font-body font-semibold text-sm" style={{ color: 'var(--color-navy)' }}>Continue to Paynow</p>
+              <p className="font-body text-xs mt-0.5" style={{ color: 'var(--color-muted)' }}>
+                You will be redirected to Paynow&apos;s secure page to enter your EcoCash number.
+              </p>
             </div>
-          </div>
-          <input
-            type="tel"
-            className="form-input"
-            placeholder="+263 77 123 4567"
-            value={mobilePhone}
-            onChange={(e) => setMobilePhone(e.target.value)}
-          />
-          <div className="rounded-lg p-3 text-xs border-l-2" style={{ background: '#fef3c7', borderColor: '#fbbf24', color: '#92400e' }}>
-            <p className="font-semibold mb-1">Testing EcoCash?</p>
-            <p>In test mode, use a valid Zimbabwe phone number format like <strong>0771234567</strong> or <strong>0781234567</strong>.</p>
           </div>
           <div className="flex items-start gap-3">
             <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-bold text-white" style={{ background: 'var(--color-navy)' }}>2</div>
             <p className="font-body text-sm pt-1" style={{ color: 'var(--color-muted)' }}>
-              Approve the <strong>{formatCurrency(total)}</strong> prompt on your phone when it arrives, then check your email for confirmation.
+              Approve the <strong>{formatCurrency(total)}</strong> prompt on your phone, then check your email for confirmation.
             </p>
           </div>
         </div>

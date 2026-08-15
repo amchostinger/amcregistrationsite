@@ -42,9 +42,10 @@ router.post('/initiate', initiateValidation, async (req, res, next) => {
       return res.status(409).json({ error: 'This registration has already been paid.' });
     }
 
-    // Mobile money requires a phone number
-    if (['ecocash', 'telecash'].includes(paymentMethod) && !phone) {
-      return res.status(422).json({ error: 'Phone number is required for mobile money payments.' });
+    // Telecash pushes a USSD prompt straight to the handset, so it needs the
+    // number up front. EcoCash redirects to Paynow, which collects it there.
+    if (paymentMethod === 'telecash' && !phone) {
+      return res.status(422).json({ error: 'Phone number is required for Telecash payments.' });
     }
 
     // Recalculate totals to ensure the amount requested is authoritative
@@ -125,10 +126,12 @@ router.post('/initiate', initiateValidation, async (req, res, next) => {
       });
     } catch (err) {
       console.error('[Paynow Error]', err.message);
+      // Recording the failure must never mask it: if this write fails the
+      // delegate should still get the 502 below, not an opaque 500.
       await query(
         `UPDATE payments SET status = 'failed', paynow_status_raw = ? WHERE id = ?`,
-        [err.message, paymentId]
-      );
+        [String(err.message || 'Unknown gateway error').slice(0, 1000), paymentId]
+      ).catch((dbErr) => console.error('[Paynow Error] could not record failure:', dbErr.message));
       return res.status(502).json({
         success: false,
         error: 'Payment gateway is temporarily unavailable. Please try again in a moment or choose bank transfer.',

@@ -50,7 +50,7 @@ const BANK_DETAILS = {
   bank:        'CBZ Bank Zimbabwe',
   branch:      'Harare Main Branch',
   account:     '05223041780052',
-  swift:       'COBZZWHAXXX',
+  swift:       'ECOCZWHXXXX',
   accountName: 'Africa Methodist Council — Conference 2027',
 };
 
