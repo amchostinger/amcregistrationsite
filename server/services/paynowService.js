@@ -64,6 +64,32 @@ function isTestMode() {
 }
 
 /**
+ * Normalise a Zimbabwean mobile number to the local 0XXXXXXXXX form Paynow
+ * expects. Delegates write their numbers every which way — "+263 77 110 7173",
+ * "263771107173", "077-110-7173" — and all of them mean the same handset.
+ *
+ * @param {string} phone - Number as typed by the delegate
+ * @returns {string} Local format, or the cleaned input if it isn't recognisable
+ */
+function normalizeZimbabwePhone(phone) {
+  if (!phone) return '';
+
+  // Strip spaces, dashes, dots and brackets; keep a leading + for the next step
+  const cleaned = String(phone).trim().replace(/[\s().-]/g, '');
+
+  // +263… or 263… → 0…
+  const withoutCountryCode = cleaned.replace(/^(?:\+?263)/, '');
+  if (withoutCountryCode !== cleaned) {
+    return `0${withoutCountryCode.replace(/^0+/, '')}`;
+  }
+
+  // Bare subscriber number (77…, 71…) with no trunk prefix → 0…
+  if (/^7[0-9]{8}$/.test(cleaned)) return `0${cleaned}`;
+
+  return cleaned;
+}
+
+/**
  * Validate phone number for test mode
  * In test mode, EcoCash/Telecash need valid test numbers
  * @param {string} phone - Phone number to validate
@@ -117,13 +143,17 @@ async function initiatePayment({ registrant, amount, currency, paymentMethod, ph
   console.log('[Paynow] Test Mode:', isTestMode());
   console.log('[Paynow] Using merchant email:', merchantEmail);
 
-  // For mobile money methods in test mode, validate phone number
-  if (['ecocash', 'telecash'].includes(paymentMethod)) {
-    const validation = validatePhoneForTestMode(phone, paymentMethod);
+  // Telecash still uses the direct USSD push, so its number is normalised and
+  // validated here. EcoCash goes through Paynow's hosted page instead (see
+  // below), where the subscriber enters their own number.
+  let mobileNumber = phone;
+  if (paymentMethod === 'telecash') {
+    mobileNumber = normalizeZimbabwePhone(phone);
+    const validation = validatePhoneForTestMode(mobileNumber, paymentMethod);
     if (!validation.valid) {
       throw new Error(validation.message);
     }
-    console.log(`[Paynow] ${paymentMethod.toUpperCase()} Phone: ${phone}`);
+    console.log(`[Paynow] ${paymentMethod.toUpperCase()} Phone: ${mobileNumber}`);
   }
 
   // Create a Paynow payment object with merchant email (required in test mode)
@@ -144,14 +174,10 @@ async function initiatePayment({ registrant, amount, currency, paymentMethod, ph
   let response;
 
   try {
-    if (paymentMethod === 'ecocash') {
-      // Mobile money — EcoCash
-      console.log('[Paynow] Initiating EcoCash transaction...');
-      response = await withTimeout(paynow.sendMobile(payment, phone, 'ecocash'), 15000, 'Paynow EcoCash request timed out');
-    } else if (paymentMethod === 'telecash') {
+    if (paymentMethod === 'telecash') {
       // Mobile money — Telecash
       console.log('[Paynow] Initiating Telecash transaction...');
-      response = await withTimeout(paynow.sendMobile(payment, phone, 'telecash'), 15000, 'Paynow Telecash request timed out');
+      response = await withTimeout(paynow.sendMobile(payment, mobileNumber, 'telecash'), 15000, 'Paynow Telecash request timed out');
     } else {
       // Web/card payment — redirects to Paynow hosted page
       console.log('[Paynow] Initiating web/card transaction...');
