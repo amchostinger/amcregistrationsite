@@ -1,6 +1,7 @@
 ﻿import { Link } from "react-router-dom";
 import { Calendar, Mic2, Hotel, PenLine, Users, Globe, Star, Clock, ArrowRight, ChevronDown, BookOpen, Award, Handshake, Music } from "lucide-react";
 import CountdownTimer from "../components/ui/CountdownTimer";
+import BrandMark from "../components/layout/BrandMark";
 
 const HERO_IMAGE = "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=1920&q=80";
 
@@ -52,10 +53,12 @@ export default function Home() {
             Official site: africamethodistcouncil.org
             <ArrowRight size={11} className="group-hover:translate-x-0.5 transition-transform" />
           </a>
-          <div className="w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-7 animate-float"
-            style={{ border: "2px solid var(--color-gold)", background: "rgba(201,168,76,0.1)", boxShadow: "0 0 40px rgba(201,168,76,0.18), inset 0 0 20px rgba(201,168,76,0.06)" }}>
-            <span style={{ fontFamily: "Cinzel, serif" }} className="text-gold font-bold text-lg tracking-widest">AMC</span>
-          </div>
+          <BrandMark
+            size={96}
+            textClass="text-lg"
+            className="mx-auto mb-7 animate-float"
+            style={{ boxShadow: "0 0 40px rgba(201,168,76,0.18), inset 0 0 20px rgba(201,168,76,0.06)" }}
+          />
           <p className="text-xs font-body font-bold uppercase tracking-[0.3em] mb-4 animate-fade-up" style={{ color: "var(--color-gold)" }}>
             Africa Methodist Council &middot; 3rd General Conference
           </p>

@@ -6,13 +6,16 @@ import RichText from "../components/ui/RichText";
 /**
  * The three headings participants are organised under. Order here is the order
  * the sections appear on the page; people are sorted by display_order within
- * each one.
+ * each one, flowing four to a row so every section reads consistently.
  */
 const SECTIONS = [
-  { key: "speaker",   title: "Speakers",  blurb: "Bishops, prelates and distinguished guests presenting at the conference." },
-  { key: "host",      title: "Host",      blurb: "The host church and local organising leadership." },
-  { key: "secretary", title: "Secretary", blurb: "The conference secretariat." },
+  { key: "speaker",   title: "Speakers",    blurb: "Bishops, prelates and distinguished guests presenting at the conference." },
+  { key: "host",      title: "Host",        blurb: "The host church and local organising leadership." },
+  { key: "secretary", title: "Secretariat", blurb: "The conference secretariat." },
 ];
+
+/** Every section uses this one grid, so card size never varies between them. */
+const GRID = "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5";
 
 const SPEAKERS_HEADER = "https://images.unsplash.com/photo-1475721027785-f74eccf877e2?w=1920&q=80";
 
@@ -119,13 +122,13 @@ function SpeakerCard({ speaker, onClick }) {
           </div>
         )}
       </div>
-      <div className="p-5">
-        <p className="text-[10px] font-body font-bold uppercase tracking-widest mb-1" style={{ color: "var(--color-gold)" }}>{speaker.designation}</p>
-        <h3 style={{ fontFamily: "Cinzel, serif", color: "var(--color-navy)" }} className="text-sm font-bold mb-1 leading-snug group-hover:text-gold transition-colors">{speaker.name}</h3>
-        <p className="font-body text-xs mb-0.5" style={{ color: "var(--color-muted)" }}>{speaker.church}</p>
-        {speaker.country && <p className="font-body text-xs flex items-center justify-center gap-1" style={{ color: "var(--color-muted)" }}><MapPin size={9} />{speaker.country}</p>}
-        <div className="flex items-center justify-center gap-1 mt-3 text-xs font-body font-semibold" style={{ color: "var(--color-gold)" }}>
-          View Bio <ArrowRight size={11} className="group-hover:translate-x-0.5 transition-transform" />
+      <div className="p-3.5">
+        <p className="text-[9px] font-body font-bold uppercase tracking-widest mb-1 leading-tight" style={{ color: "var(--color-gold)" }}>{speaker.designation}</p>
+        <h3 style={{ fontFamily: "Cinzel, serif", color: "var(--color-navy)" }} className="text-xs font-bold mb-1 leading-snug group-hover:text-gold transition-colors">{speaker.name}</h3>
+        <p className="font-body text-[11px] mb-0.5 leading-snug" style={{ color: "var(--color-muted)" }}>{speaker.church}</p>
+        {speaker.country && <p className="font-body text-[11px] flex items-center justify-center gap-1" style={{ color: "var(--color-muted)" }}><MapPin size={9} />{speaker.country}</p>}
+        <div className="flex items-center justify-center gap-1 mt-2 text-[11px] font-body font-semibold" style={{ color: "var(--color-gold)" }}>
+          View Bio <ArrowRight size={10} className="group-hover:translate-x-0.5 transition-transform" />
         </div>
       </div>
     </button>
@@ -199,8 +202,6 @@ export default function Speakers() {
           </div>
         )}
 
-        {/* Three columns at desktop width, so the running order reads as the
-            rows it was planned in. */}
         {sections.map(({ key, title, blurb, people }) => (
           <section key={key} className="mb-14 last:mb-0">
             <div className="flex items-center gap-4 mb-2">
@@ -210,7 +211,8 @@ export default function Speakers() {
               <span className="flex-1 h-px" style={{ background: "rgba(201,168,76,0.35)" }} />
             </div>
             <p className="font-body text-xs mb-6" style={{ color: "var(--color-muted)" }}>{blurb}</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+
+            <div className={GRID}>
               {people.map((s) => (
                 <SpeakerCard key={s.id} speaker={s} onClick={() => setSelected(s)} />
               ))}
