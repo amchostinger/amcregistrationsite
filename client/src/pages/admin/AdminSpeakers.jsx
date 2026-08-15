@@ -18,7 +18,7 @@ const EMPTY = {
 const CATEGORIES = [
   { value: 'speaker',   label: 'Speakers' },
   { value: 'host',      label: 'Host' },
-  { value: 'secretary', label: 'Secretary' },
+  { value: 'secretary', label: 'Secretariat' },
 ];
 
 export default function AdminSpeakers() {
