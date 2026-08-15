@@ -162,8 +162,7 @@ export default function Home() {
       <section className="py-20 relative overflow-hidden" style={{ background: "var(--navy-gradient)" }}>
         <div className="section-container max-w-3xl mx-auto text-center relative z-10">
           <span className="section-label" style={{ color: "rgba(201,168,76,0.8)" }}>Conference Theme</span>
-          <h2 style={{ fontFamily: "Cinzel, serif" }} className="text-2xl font-bold text-white uppercase tracking-widest mb-6">The Theme</h2>
-          <div style={{ height: "2px", width: "48px", background: "var(--gold-gradient)", margin: "0 auto 2rem" }} className="rounded-full" />
+          <div style={{ height: "2px", width: "48px", background: "var(--gold-gradient)", margin: "1.5rem auto 2rem" }} className="rounded-full" />
           <blockquote style={{ fontFamily: "Cormorant Garamond, serif", color: "white" }} className="text-3xl lg:text-4xl italic font-medium mb-4 leading-relaxed">
             "Equipped to transform,<br />Africa's sociopolitical and economic landscape"
           </blockquote>

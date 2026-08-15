@@ -4,11 +4,13 @@
 
 import { Link } from "react-router-dom";
 import { Mail, Globe, MapPin, ArrowUpRight, Heart } from "lucide-react";
+import BrandMark from "./BrandMark";
 
 const LINKS = [
   { to: "/about",    label: "About the Conference" },
   { to: "/schedule", label: "Program Schedule" },
   { to: "/speakers", label: "Speakers" },
+  { to: "/resources", label: "Resources" },
   { to: "/hotels",   label: "Hotels" },
   { to: "/venue",    label: "Venue & Travel" },
   { to: "/register", label: "Register Now" },
@@ -26,12 +28,7 @@ export default function Footer() {
           {/* Brand */}
           <div className="md:col-span-1">
             <div className="flex items-center gap-3 mb-5">
-              <div
-                className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0"
-                style={{ border: "2px solid var(--color-gold)", background: "rgba(201,168,76,0.12)" }}
-              >
-                <span style={{ fontFamily: "Cinzel, serif" }} className="text-gold font-bold text-sm">AMC</span>
-              </div>
+              <BrandMark size={48} textClass="text-sm" />
               <div>
                 <div style={{ fontFamily: "Cinzel, serif" }} className="text-white text-sm font-semibold tracking-wide uppercase">Africa Methodist Council</div>
                 <div className="text-gold text-[11px] tracking-wider mt-0.5 font-body">3rd General Conference 2027</div>

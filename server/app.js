@@ -18,6 +18,8 @@ const scheduleRouter = require('./routes/schedule');
 const speakersRouter = require('./routes/speakers');
 const hotelsRouter = require('./routes/hotels');
 const uploadsRouter = require('./routes/uploads');
+const resourcesRouter = require('./routes/resources');
+const awardsRouter = require('./routes/awards');
 const errorHandler = require('./middleware/errorHandler');
 
 const app = express();
@@ -72,6 +74,8 @@ app.use('/api/schedule', scheduleRouter);
 app.use('/api/speakers', speakersRouter);
 app.use('/api/hotels', hotelsRouter);
 app.use('/api/uploads', uploadsRouter);
+app.use('/api/resources', resourcesRouter);
+app.use('/api/awards', awardsRouter);
 
 // ─── 404 Handler ──────────────────────────────────────────────────────────────
 app.use((req, res) => {

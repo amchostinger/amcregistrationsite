@@ -328,19 +328,22 @@ router.patch('/settings', async (req, res, next) => {
 
 router.get('/speakers', async (req, res, next) => {
   try {
-    // Newest first, matching the public page.
-    const [rows] = await query('SELECT * FROM speakers ORDER BY id DESC');
+    // Conference running order, matching the public page.
+    const [rows] = await query('SELECT * FROM speakers ORDER BY display_order ASC, id ASC');
     res.json(rows);
   } catch (err) { next(err); }
 });
 
+const SPEAKER_CATEGORIES = ['speaker', 'host', 'secretary'];
+const speakerCategory = (v) => (SPEAKER_CATEGORIES.includes(v) ? v : 'speaker');
+
 router.post('/speakers', async (req, res, next) => {
   try {
-    const { name, designation, church, country, bio, photo_url, keynote, display_order } = req.body;
+    const { name, designation, church, country, bio, photo_url, keynote, category, display_order } = req.body;
     const [result] = await query(
-      `INSERT INTO speakers (name, designation, church, country, bio, photo_url, keynote, display_order)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [name, designation || '', church || '', country || '', bio || '', photo_url || '', keynote ? 1 : 0, display_order || 0]
+      `INSERT INTO speakers (name, designation, church, country, bio, photo_url, keynote, category, display_order)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [name, designation || '', church || '', country || '', bio || '', photo_url || '', keynote ? 1 : 0, speakerCategory(category), display_order || 0]
     );
     res.status(201).json({ id: result.insertId });
   } catch (err) { next(err); }
@@ -348,10 +351,10 @@ router.post('/speakers', async (req, res, next) => {
 
 router.put('/speakers/:id', async (req, res, next) => {
   try {
-    const { name, designation, church, country, bio, photo_url, keynote, display_order } = req.body;
+    const { name, designation, church, country, bio, photo_url, keynote, category, display_order } = req.body;
     await query(
-      `UPDATE speakers SET name=?, designation=?, church=?, country=?, bio=?, photo_url=?, keynote=?, display_order=? WHERE id=?`,
-      [name, designation || '', church || '', country || '', bio || '', photo_url || '', keynote ? 1 : 0, display_order || 0, req.params.id]
+      `UPDATE speakers SET name=?, designation=?, church=?, country=?, bio=?, photo_url=?, keynote=?, category=?, display_order=? WHERE id=?`,
+      [name, designation || '', church || '', country || '', bio || '', photo_url || '', keynote ? 1 : 0, speakerCategory(category), display_order || 0, req.params.id]
     );
     res.json({ ok: true });
   } catch (err) { next(err); }
@@ -360,6 +363,105 @@ router.put('/speakers/:id', async (req, res, next) => {
 router.delete('/speakers/:id', async (req, res, next) => {
   try {
     await query('DELETE FROM speakers WHERE id=?', [req.params.id]);
+    res.json({ ok: true });
+  } catch (err) { next(err); }
+});
+
+// ─── RESOURCES CRUD ───────────────────────────────────────────────────────────
+
+const RESOURCE_CATEGORIES = ['Presentation', 'Keynote Material', 'Document', 'Report', 'Other'];
+const resourceCategory = (v) => (RESOURCE_CATEGORIES.includes(v) ? v : 'Document');
+
+router.get('/resources', async (req, res, next) => {
+  try {
+    const [rows] = await query('SELECT * FROM resources ORDER BY display_order ASC, id DESC');
+    res.json(rows);
+  } catch (err) { next(err); }
+});
+
+router.post('/resources', async (req, res, next) => {
+  try {
+    const { title, description, category, speaker_name, file_url, external_url, file_size, published, display_order } = req.body;
+    if (!title || !String(title).trim()) return res.status(400).json({ error: 'Title is required' });
+    if (!file_url && !external_url) return res.status(400).json({ error: 'Attach a file or provide a link' });
+
+    const [result] = await query(
+      `INSERT INTO resources (title, description, category, speaker_name, file_url, external_url, file_size, published, display_order)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [String(title).trim(), description || '', resourceCategory(category), speaker_name || '',
+       file_url || '', external_url || '', Number(file_size) || 0, published === false ? 0 : 1, display_order || 0]
+    );
+    await auditLog(req.auth?.userId, 'create', 'resources', result.insertId, title);
+    res.status(201).json({ id: result.insertId });
+  } catch (err) { next(err); }
+});
+
+router.put('/resources/:id', async (req, res, next) => {
+  try {
+    const { title, description, category, speaker_name, file_url, external_url, file_size, published, display_order } = req.body;
+    if (!title || !String(title).trim()) return res.status(400).json({ error: 'Title is required' });
+
+    await query(
+      `UPDATE resources SET title=?, description=?, category=?, speaker_name=?, file_url=?, external_url=?,
+              file_size=?, published=?, display_order=? WHERE id=?`,
+      [String(title).trim(), description || '', resourceCategory(category), speaker_name || '',
+       file_url || '', external_url || '', Number(file_size) || 0, published === false ? 0 : 1, display_order || 0, req.params.id]
+    );
+    await auditLog(req.auth?.userId, 'update', 'resources', req.params.id, title);
+    res.json({ ok: true });
+  } catch (err) { next(err); }
+});
+
+router.delete('/resources/:id', async (req, res, next) => {
+  try {
+    await query('DELETE FROM resources WHERE id=?', [req.params.id]);
+    await auditLog(req.auth?.userId, 'delete', 'resources', req.params.id, null);
+    res.json({ ok: true });
+  } catch (err) { next(err); }
+});
+
+// ─── AWARD CATEGORIES CRUD ────────────────────────────────────────────────────
+
+router.get('/award-categories', async (req, res, next) => {
+  try {
+    const [rows] = await query('SELECT * FROM award_categories ORDER BY display_order ASC, id ASC');
+    res.json(rows);
+  } catch (err) { next(err); }
+});
+
+router.post('/award-categories', async (req, res, next) => {
+  try {
+    const { title, description, criteria, published, display_order } = req.body;
+    if (!title || !String(title).trim()) return res.status(400).json({ error: 'Title is required' });
+
+    const [result] = await query(
+      `INSERT INTO award_categories (title, description, criteria, published, display_order)
+       VALUES (?, ?, ?, ?, ?)`,
+      [String(title).trim(), description || '', criteria || '', published === false ? 0 : 1, display_order || 0]
+    );
+    await auditLog(req.auth?.userId, 'create', 'award_categories', result.insertId, title);
+    res.status(201).json({ id: result.insertId });
+  } catch (err) { next(err); }
+});
+
+router.put('/award-categories/:id', async (req, res, next) => {
+  try {
+    const { title, description, criteria, published, display_order } = req.body;
+    if (!title || !String(title).trim()) return res.status(400).json({ error: 'Title is required' });
+
+    await query(
+      `UPDATE award_categories SET title=?, description=?, criteria=?, published=?, display_order=? WHERE id=?`,
+      [String(title).trim(), description || '', criteria || '', published === false ? 0 : 1, display_order || 0, req.params.id]
+    );
+    await auditLog(req.auth?.userId, 'update', 'award_categories', req.params.id, title);
+    res.json({ ok: true });
+  } catch (err) { next(err); }
+});
+
+router.delete('/award-categories/:id', async (req, res, next) => {
+  try {
+    await query('DELETE FROM award_categories WHERE id=?', [req.params.id]);
+    await auditLog(req.auth?.userId, 'delete', 'award_categories', req.params.id, null);
     res.json({ ok: true });
   } catch (err) { next(err); }
 });
