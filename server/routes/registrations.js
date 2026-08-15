@@ -31,8 +31,8 @@ const DESIGNATIONS = [
 ];
 
 const OFFICES = [
-  'Administrative Assistant','AMC Executive Member','Bishop','Conference Secretary',
-  'General Secretary','Prelate','Presiding Bishop','Secretary of Conference',
+  'Administrative Assistant','Admin Bishop','AMC Executive Member','Bishop','Conference Secretary',
+  'General Secretary','Prelate','Presiding Bishop','Secretary of Conference','Other',
 ];
 
 const registrationValidation = [

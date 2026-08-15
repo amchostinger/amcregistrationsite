@@ -6,12 +6,14 @@
 import { useState, useEffect } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
 import { Menu, X, ArrowRight } from "lucide-react";
+import BrandMark from "./BrandMark";
 
 const NAV_LINKS = [
   { to: "/",         label: "Home",     exact: true },
   { to: "/about",    label: "About" },
   { to: "/schedule", label: "Schedule" },
   { to: "/speakers", label: "Speakers" },
+  { to: "/resources", label: "Resources" },
   { to: "/venue",    label: "Venue" },
   { to: "/hotels",   label: "Hotels" },
 ];
@@ -47,12 +49,7 @@ export default function Navbar() {
 
           {/* Brand */}
           <Link to="/" className="flex items-center gap-3 group flex-shrink-0">
-            <div
-              className="w-10 h-10 rounded-full flex items-center justify-center transition-all duration-200 group-hover:scale-105"
-              style={{ border: "2px solid var(--color-gold)", background: "rgba(201,168,76,0.12)" }}
-            >
-              <span style={{ fontFamily: "Cinzel, serif" }} className="text-gold font-bold text-xs tracking-wider">AMC</span>
-            </div>
+            <BrandMark size={40} textClass="text-xs" />
             <div className="hidden sm:block">
               <div style={{ fontFamily: "Cinzel, serif" }} className="text-white text-[11px] font-semibold tracking-widest uppercase leading-none">Africa Methodist Council</div>
               <div className="text-gold text-[10px] tracking-[0.2em] mt-0.5 font-body">Conference 2027</div>

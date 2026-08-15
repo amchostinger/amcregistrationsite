@@ -1,7 +1,18 @@
-﻿import { useState, useEffect } from "react";
+﻿import { useState, useEffect, useMemo } from "react";
 import { X, MapPin, Star, ArrowRight } from "lucide-react";
 import api, { assetUrl } from "../lib/api";
 import RichText from "../components/ui/RichText";
+
+/**
+ * The three headings participants are organised under. Order here is the order
+ * the sections appear on the page; people are sorted by display_order within
+ * each one.
+ */
+const SECTIONS = [
+  { key: "speaker",   title: "Speakers",  blurb: "Bishops, prelates and distinguished guests presenting at the conference." },
+  { key: "host",      title: "Host",      blurb: "The host church and local organising leadership." },
+  { key: "secretary", title: "Secretary", blurb: "The conference secretariat." },
+];
 
 const SPEAKERS_HEADER = "https://images.unsplash.com/photo-1475721027785-f74eccf877e2?w=1920&q=80";
 
@@ -135,6 +146,20 @@ export default function Speakers() {
       .finally(() => setLoading(false));
   }, []);
 
+  // Anyone whose category is missing or unrecognised falls back to "Speakers",
+  // so a new record never disappears from the page.
+  const sections = useMemo(() => {
+    const known = SECTIONS.map((s) => s.key);
+    return SECTIONS
+      .map((s) => ({
+        ...s,
+        people: speakers.filter((p) =>
+          s.key === "speaker" ? !known.includes(p.category) || p.category === "speaker" : p.category === s.key
+        ),
+      }))
+      .filter((s) => s.people.length);
+  }, [speakers]);
+
   return (
     <div className="min-h-screen" style={{ background: "var(--color-cream)" }}>
       {/* Header */}
@@ -174,11 +199,24 @@ export default function Speakers() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {speakers.map((s) => (
-            <SpeakerCard key={s.id} speaker={s} onClick={() => setSelected(s)} />
-          ))}
-        </div>
+        {/* Three columns at desktop width, so the running order reads as the
+            rows it was planned in. */}
+        {sections.map(({ key, title, blurb, people }) => (
+          <section key={key} className="mb-14 last:mb-0">
+            <div className="flex items-center gap-4 mb-2">
+              <h2 style={{ fontFamily: "Cinzel, serif", color: "var(--color-navy)" }} className="text-lg font-bold uppercase tracking-widest whitespace-nowrap">
+                {title}
+              </h2>
+              <span className="flex-1 h-px" style={{ background: "rgba(201,168,76,0.35)" }} />
+            </div>
+            <p className="font-body text-xs mb-6" style={{ color: "var(--color-muted)" }}>{blurb}</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {people.map((s) => (
+                <SpeakerCard key={s.id} speaker={s} onClick={() => setSelected(s)} />
+              ))}
+            </div>
+          </section>
+        ))}
 
         <p className="text-center font-body text-xs mt-12" style={{ color: "var(--color-muted)" }}>
           * Full speaker list will be confirmed closer to the conference.

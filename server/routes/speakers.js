@@ -1,6 +1,6 @@
 /**
  * routes/speakers.js
- * GET /api/speakers      — all speakers, newest added first
+ * GET /api/speakers      — all speakers, in conference running order
  * GET /api/speakers/:id  — single speaker
  */
 
@@ -11,8 +11,8 @@ const { query } = require('../config/db');
 router.get('/', async (req, res, next) => {
   try {
     const [rows] = await query(
-      // Newest speaker first, oldest last.
-      'SELECT id, name, designation, church, country, bio, photo_url, keynote, display_order FROM speakers ORDER BY id DESC'
+      // Conference running order (display_order), newest added last as a tie-break.
+      'SELECT id, name, designation, church, country, bio, photo_url, keynote, category, display_order FROM speakers ORDER BY display_order ASC, id ASC'
     );
     res.json(rows);
   } catch (err) {

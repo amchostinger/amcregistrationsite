@@ -1,5 +1,6 @@
 ﻿import { Link } from "react-router-dom";
 import { MapPin, Plane, Navigation, Hotel, BookOpen, Users2, Mic2, Handshake, Award, Vote, Ribbon, Flag, Globe, Church } from "lucide-react";
+import AwardCategories from "../components/ui/AwardCategories";
 
 const ABOUT_HEADER = "https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=1920&q=80";
 
@@ -259,6 +260,9 @@ He has sent me to bind up the brokenhearted, to proclaim freedom for the captive
           </div>
           <Link to="/schedule" className="btn-primary">View Full Schedule</Link>
         </section>
+
+        {/* Awards ------------------------------------------------------------ */}
+        <AwardCategories showWhenEmpty />
       </div>
     </div>
   );

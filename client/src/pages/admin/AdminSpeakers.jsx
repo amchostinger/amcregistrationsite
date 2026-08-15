@@ -10,8 +10,16 @@ import api, { assetUrl } from '../../lib/api';
 import RichTextEditor from '../../components/ui/RichTextEditor';
 
 const EMPTY = {
-  name: '', designation: '', church: '', country: '', bio: '', photo_url: '', keynote: false, display_order: 0,
+  name: '', designation: '', church: '', country: '', bio: '', photo_url: '',
+  keynote: false, category: 'speaker', display_order: 0,
 };
+
+/** Headings the public Speakers page groups people under. */
+const CATEGORIES = [
+  { value: 'speaker',   label: 'Speakers' },
+  { value: 'host',      label: 'Host' },
+  { value: 'secretary', label: 'Secretary' },
+];
 
 export default function AdminSpeakers() {
   const { token } = useAuth();
@@ -128,6 +136,7 @@ export default function AdminSpeakers() {
                 <th className="text-left px-4 py-3 font-semibold" style={{ color: 'var(--color-navy)' }}>Name</th>
                 <th className="text-left px-4 py-3 font-semibold hidden sm:table-cell" style={{ color: 'var(--color-navy)' }}>Church</th>
                 <th className="text-left px-4 py-3 font-semibold hidden md:table-cell" style={{ color: 'var(--color-navy)' }}>Country</th>
+                <th className="text-left px-4 py-3 font-semibold hidden md:table-cell" style={{ color: 'var(--color-navy)' }}>Section</th>
                 <th className="text-center px-4 py-3 font-semibold" style={{ color: 'var(--color-navy)' }}>Keynote</th>
                 <th className="text-right px-4 py-3" />
               </tr>
@@ -140,6 +149,9 @@ export default function AdminSpeakers() {
                   </td>
                   <td className="px-4 py-3 text-gray-500 hidden sm:table-cell">{s.church}</td>
                   <td className="px-4 py-3 text-gray-500 hidden md:table-cell">{s.country}</td>
+                  <td className="px-4 py-3 text-gray-500 hidden md:table-cell">
+                    {CATEGORIES.find((c) => c.value === (s.category || 'speaker'))?.label}
+                  </td>
                   <td className="px-4 py-3 text-center">
                     {s.keynote ? <span className="badge-gold">Yes</span> : <span className="text-gray-300">—</span>}
                   </td>
@@ -150,7 +162,7 @@ export default function AdminSpeakers() {
                 </tr>
               ))}
               {!speakers.length && (
-                <tr><td colSpan={5} className="px-4 py-10 text-center text-gray-400 font-body">No speakers yet. Add one above.</td></tr>
+                <tr><td colSpan={6} className="px-4 py-10 text-center text-gray-400 font-body">No speakers yet. Add one above.</td></tr>
               )}
             </tbody>
           </table>
@@ -257,6 +269,28 @@ export default function AdminSpeakers() {
                       />
                     )}
                   </div>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="form-label">Section</label>
+                  <select
+                    className="form-input"
+                    value={form.category || 'speaker'}
+                    onChange={e => setForm({ ...form, category: e.target.value })}
+                  >
+                    {CATEGORIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="form-label">Display order</label>
+                  <input
+                    type="number"
+                    className="form-input"
+                    value={form.display_order ?? 0}
+                    onChange={e => setForm({ ...form, display_order: Number(e.target.value) })}
+                  />
+                  <p className="text-[11px] text-gray-400 font-body mt-1">Lower numbers appear first within the section.</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
