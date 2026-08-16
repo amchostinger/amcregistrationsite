@@ -71,10 +71,10 @@ export default function Footer() {
               <p className="text-white/60 text-sm leading-relaxed">General Secretariat, Africa Methodist Council</p>
               <a
                 href="mailto:conference@africamethodistcouncil.org"
-                className="flex items-center gap-2 text-white/60 hover:text-gold transition-colors text-sm group"
+                className="flex items-start gap-2 text-white/60 hover:text-gold transition-colors text-sm group break-words min-w-0"
               >
-                <Mail size={14} className="text-gold/60 group-hover:text-gold transition-colors flex-shrink-0" />
-                conference@africamethodistcouncil.org
+                <Mail size={14} className="text-gold/60 group-hover:text-gold transition-colors flex-shrink-0 mt-0.5" />
+                <span className="min-w-0 break-words">conference@africamethodistcouncil.org</span>
               </a>
               <a
                 href="https://africamethodistcouncil.org"

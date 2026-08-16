@@ -59,7 +59,7 @@ function BankTransferConfirmation({ ref_, hotelName, hotelWebsiteUrl }) {
     <div className="min-h-screen" style={{ background: 'var(--color-cream)' }}>
       <div className="pt-24 pb-14" style={{ background: 'var(--navy-gradient)' }}>
         <div className="section-container text-center">
-          <h1 style={{ fontFamily: 'Cinzel, serif' }} className="text-4xl font-bold text-white uppercase tracking-widest mb-2">
+          <h1 style={{ fontFamily: 'Cinzel, serif' }} className="page-title text-white mb-2">
             Almost Done
           </h1>
           <div className="mx-auto mt-3" style={{ width: 40, height: 2, background: 'var(--gold-gradient)', borderRadius: 2 }} />
@@ -105,7 +105,7 @@ function BankTransferConfirmation({ ref_, hotelName, hotelWebsiteUrl }) {
 
           <div className="rounded-lg p-4 text-sm font-body mb-6" style={{ background: 'rgba(201,168,76,0.1)', border: '1px solid rgba(201,168,76,0.3)' }}>
             <strong>Important:</strong> Email your proof of payment to{' '}
-            <a href="mailto:conference@africamethodistcouncil.org" className="underline" style={{ color: 'var(--color-navy)' }}>
+            <a href="mailto:conference@africamethodistcouncil.org" className="underline break-words" style={{ color: 'var(--color-navy)' }}>
               conference@africamethodistcouncil.org
             </a>{' '}
             with your registration reference in the subject line. Your attendance will be confirmed within 24 business hours.
@@ -196,7 +196,7 @@ export default function PaymentStatus() {
       {/* Header */}
       <div className="pt-24 pb-14" style={{ background: 'var(--navy-gradient)' }}>
         <div className="section-container text-center">
-          <h1 style={{ fontFamily: 'Cinzel, serif' }} className="text-4xl font-bold text-white uppercase tracking-widest mb-2">
+          <h1 style={{ fontFamily: 'Cinzel, serif' }} className="page-title text-white mb-2">
             Payment Status
           </h1>
           <div className="mx-auto mt-3 block" style={{ width: 40, height: 2, background: 'var(--gold-gradient)', borderRadius: 2 }} />

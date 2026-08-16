@@ -40,7 +40,7 @@ function StepIndicator({ currentStep }) {
             </span>
           </div>
           {i < STEPS.length - 1 && (
-            <div className="w-16 sm:w-24 h-px mx-3 mb-5 rounded-full transition-all duration-300"
+            <div className="w-8 sm:w-24 h-px mx-2 sm:mx-3 mb-5 rounded-full transition-all duration-300"
               style={{ background: currentStep > step.num ? "#059669" : "#e5e7eb" }} />
           )}
         </div>
@@ -76,7 +76,7 @@ export default function Register() {
         <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, rgba(15,30,51,0.65), rgba(15,30,51,0.92))" }} />
         <div className="section-container text-center relative z-10 pt-6">
           <span className="section-label">AMC 2027</span>
-          <h1 style={{ fontFamily: "Cinzel, serif" }} className="text-4xl lg:text-5xl font-bold text-white uppercase tracking-widest mb-3">
+          <h1 style={{ fontFamily: "Cinzel, serif" }} className="page-title text-white mb-3">
             Conference Registration
           </h1>
           <div style={{ height: "3px", width: "48px", background: "var(--gold-gradient)", margin: "0 auto" }} className="rounded-full" />
@@ -84,14 +84,14 @@ export default function Register() {
         </div>
       </div>
 
-      <div className="section-container max-w-2xl mx-auto py-12">
+      <div className="section-container max-w-2xl mx-auto py-8 sm:py-12">
         {!isCompleted && <StepIndicator currentStep={step} />}
 
         <div className="card">
           {step === 1 && (
             <>
               <div className="mb-6">
-                <h2 style={{ fontFamily: "Cinzel, serif", color: "var(--color-navy)" }} className="text-xl font-bold uppercase tracking-wide">Personal Information</h2>
+                <h2 style={{ fontFamily: "Cinzel, serif", color: "var(--color-navy)" }} className="text-lg sm:text-xl font-bold uppercase tracking-wide">Personal Information</h2>
                 <p className="font-body text-gray-500 text-sm mt-1">Please enter your personal and professional details.</p>
               </div>
               <Step1Form defaultValues={formData} onNext={handleStep1} />
@@ -101,7 +101,7 @@ export default function Register() {
           {step === 2 && (
             <>
               <div className="mb-6">
-                <h2 style={{ fontFamily: "Cinzel, serif", color: "var(--color-navy)" }} className="text-xl font-bold uppercase tracking-wide">Additional Details</h2>
+                <h2 style={{ fontFamily: "Cinzel, serif", color: "var(--color-navy)" }} className="text-lg sm:text-xl font-bold uppercase tracking-wide">Additional Details</h2>
                 <p className="font-body text-gray-500 text-sm mt-1">Accommodation preferences and special requirements.</p>
               </div>
               <Step2Form defaultValues={formData} onNext={handleStep2} onBack={prevStep} />
@@ -117,7 +117,7 @@ export default function Register() {
           {step === 3 && (
             <>
               <div className="mb-6">
-                <h2 style={{ fontFamily: "Cinzel, serif", color: "var(--color-navy)" }} className="text-xl font-bold uppercase tracking-wide">Payment</h2>
+                <h2 style={{ fontFamily: "Cinzel, serif", color: "var(--color-navy)" }} className="text-lg sm:text-xl font-bold uppercase tracking-wide">Payment</h2>
                 <p className="font-body text-gray-500 text-sm mt-1">Complete your registration payment to confirm your place.</p>
               </div>
               <PaymentStep formData={formData} registrationRef={registrationRef} onInitiate={handlePayment} onBack={prevStep} isLoading={isLoading} />
@@ -132,7 +132,7 @@ export default function Register() {
         {!isCompleted && (
           <p className="text-center font-body text-xs mt-5" style={{ color: "var(--color-muted)" }}>
             Having trouble? Contact{" "}
-            <a href="mailto:conference@africamethodistcouncil.org" className="underline hover:text-navy transition-colors" style={{ color: "var(--color-navy)" }}>
+            <a href="mailto:conference@africamethodistcouncil.org" className="underline hover:text-navy transition-colors break-words" style={{ color: "var(--color-navy)" }}>
               conference@africamethodistcouncil.org
             </a>
           </p>

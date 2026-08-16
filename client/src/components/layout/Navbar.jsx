@@ -7,6 +7,7 @@ import { useState, useEffect } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
 import { Menu, X, ArrowRight } from "lucide-react";
 import BrandMark from "./BrandMark";
+import LanguageSwitcher from "../ui/LanguageSwitcher";
 
 const NAV_LINKS = [
   { to: "/",         label: "Home",     exact: true },
@@ -86,8 +87,12 @@ export default function Navbar() {
             ))}
           </div>
 
-          {/* Register CTA + hamburger */}
-          <div className="flex items-center gap-3">
+          {/* Language + Register CTA + hamburger */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="hidden lg:block">
+              <LanguageSwitcher />
+            </div>
+
             <Link
               to="/register"
               className="hidden sm:inline-flex items-center gap-2 font-body font-bold text-[13px] px-5 py-2.5 rounded-xl transition-all duration-200 hover:-translate-y-0.5"
@@ -115,7 +120,7 @@ export default function Navbar() {
 
       {/* Mobile drawer */}
       <div
-        className={`lg:hidden overflow-hidden transition-all duration-300 ${open ? "max-h-screen opacity-100" : "max-h-0 opacity-0"}`}
+        className={`lg:hidden overflow-hidden transition-all duration-300 ${open ? "max-h-[80vh] overflow-y-auto opacity-100" : "max-h-0 opacity-0"}`}
         style={{ borderTop: open ? "1px solid rgba(255,255,255,0.08)" : "none" }}
       >
         <div className="px-4 pb-6 pt-3 space-y-1" style={{ background: "rgba(10,20,38,0.98)" }}>
@@ -148,6 +153,8 @@ export default function Navbar() {
               <ArrowRight size={16} />
             </Link>
           </div>
+
+          <LanguageSwitcher variant="drawer" />
         </div>
       </div>
     </nav>

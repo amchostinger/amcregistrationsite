@@ -3,16 +3,21 @@
  * CRUD table for the conference award categories.
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Award } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import api from '../../lib/api';
+import FilterBar from '../../components/admin/FilterBar';
+import { inDateRange } from '../../lib/utils';
 
 const EMPTY = { title: '', description: '', criteria: '', published: true, display_order: 0 };
+
+const BLANK_FILTERS = { search: '', published: '', criteria: '', from: '', to: '' };
 
 export default function AdminAwards() {
   const { token } = useAuth();
   const [categories, setCategories] = useState([]);
+  const [filters, setFilters] = useState(BLANK_FILTERS);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(null); // null | 'add' | 'edit'
   const [form, setForm] = useState(EMPTY);
@@ -32,6 +37,24 @@ export default function AdminAwards() {
   };
 
   useEffect(() => { load(); }, []);
+
+  const setFilter = (key, value) => setFilters((f) => ({ ...f, [key]: value }));
+  const filtersActive = Object.values(filters).some(Boolean);
+
+  const visible = useMemo(() => {
+    const term = filters.search.trim().toLowerCase();
+
+    return categories.filter((c) => {
+      if (term && ![c.title, c.description, c.criteria]
+        .some((f) => (f || '').toLowerCase().includes(term))) return false;
+      if (filters.published === 'live' && !c.published) return false;
+      if (filters.published === 'draft' && c.published) return false;
+      if (filters.criteria === 'set' && !c.criteria?.trim()) return false;
+      if (filters.criteria === 'missing' && c.criteria?.trim()) return false;
+      if (!inDateRange(c.created_at, filters.from, filters.to)) return false;
+      return true;
+    });
+  }, [categories, filters]);
 
   const openAdd = () => { setForm(EMPTY); setError(''); setModal('add'); };
   const openEdit = (c) => { setForm({ ...c, published: !!c.published }); setError(''); setModal('edit'); };
@@ -69,16 +92,54 @@ export default function AdminAwards() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <h2 style={{ fontFamily: 'Cinzel, serif', color: 'var(--color-navy)' }} className="text-xl font-bold uppercase tracking-wide">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+        <h2 style={{ fontFamily: 'Cinzel, serif', color: 'var(--color-navy)' }} className="text-lg sm:text-xl font-bold uppercase tracking-wide">
           Award Categories
         </h2>
         <button className="btn-gold text-sm px-5 py-2" onClick={openAdd}>+ Add Category</button>
       </div>
 
-      <p className="font-body text-sm text-gray-500 mb-5">
+      <p className="font-body text-sm text-gray-500 mb-4">
         Categories shown in the Awards section of the public site.
       </p>
+
+      <FilterBar
+        search={filters.search}
+        onSearchChange={(v) => setFilter('search', v)}
+        searchPlaceholder="Search title, description or criteria…"
+        selects={[
+          {
+            label: 'Visibility',
+            value: filters.published,
+            onChange: (v) => setFilter('published', v),
+            options: [
+              { value: '', label: 'All visibility' },
+              { value: 'live', label: 'Live on site' },
+              { value: 'draft', label: 'Hidden' },
+            ],
+          },
+          {
+            label: 'Criteria',
+            value: filters.criteria,
+            onChange: (v) => setFilter('criteria', v),
+            options: [
+              { value: '', label: 'Criteria: any' },
+              { value: 'set', label: 'Criteria written' },
+              { value: 'missing', label: 'Criteria outstanding' },
+            ],
+          },
+        ]}
+        dateRange={{
+          label: 'Added',
+          from: filters.from,
+          to: filters.to,
+          onFromChange: (v) => setFilter('from', v),
+          onToChange: (v) => setFilter('to', v),
+        }}
+        active={filtersActive}
+        onReset={() => setFilters(BLANK_FILTERS)}
+        summary={filtersActive ? `Showing ${visible.length} of ${categories.length} categories` : `${categories.length} categories`}
+      />
 
       {loadError && (
         <div className="rounded-xl border border-red-200 bg-red-50 p-4 mb-4 text-sm text-red-700">{loadError}</div>
@@ -87,8 +148,8 @@ export default function AdminAwards() {
       {loading ? (
         <div className="flex justify-center py-20"><div className="w-6 h-6 rounded-full border-2 border-gold border-t-transparent animate-spin" /></div>
       ) : (
-        <div className="bg-white rounded-xl border border-[#e8e0d0] overflow-hidden">
-          <table className="w-full text-sm font-body">
+        <div className="bg-white rounded-xl border border-[#e8e0d0] overflow-x-auto">
+          <table className="w-full text-sm font-body min-w-[28rem]">
             <thead>
               <tr style={{ background: 'var(--color-cream-dark)' }}>
                 <th className="text-left px-4 py-3 font-semibold" style={{ color: 'var(--color-navy)' }}>Category</th>
@@ -98,7 +159,7 @@ export default function AdminAwards() {
               </tr>
             </thead>
             <tbody>
-              {categories.map((c, i) => (
+              {visible.map((c, i) => (
                 <tr key={c.id} className={i % 2 === 0 ? '' : 'bg-gray-50'}>
                   <td className="px-4 py-3 font-medium" style={{ color: 'var(--color-charcoal)' }}>
                     <span className="flex items-center gap-2">
@@ -118,10 +179,12 @@ export default function AdminAwards() {
                   </td>
                 </tr>
               ))}
-              {!categories.length && (
+              {!visible.length && (
                 <tr>
                   <td colSpan={4} className="px-4 py-10 text-center text-gray-400 font-body">
-                    No award categories yet. Add them once the details are confirmed.
+                    {categories.length
+                      ? 'No categories match these filters.'
+                      : 'No award categories yet. Add them once the details are confirmed.'}
                   </td>
                 </tr>
               )}
@@ -166,7 +229,7 @@ export default function AdminAwards() {
                   placeholder="Who qualifies and how nominees are assessed…"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4 items-end">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
                 <div>
                   <label className="form-label">Display order</label>
                   <input

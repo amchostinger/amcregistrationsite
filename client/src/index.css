@@ -20,10 +20,10 @@
   h1, h2, h3 { font-family: var(--font-display); letter-spacing: 0.04em; }
   h4, h5, h6  { font-family: var(--font-serif); }
 
-  h1 { @apply text-5xl font-bold leading-tight; }
-  h2 { @apply text-3xl font-semibold leading-snug; }
-  h3 { @apply text-2xl font-semibold; }
-  h4 { @apply text-xl font-semibold; }
+  h1 { @apply text-3xl sm:text-4xl lg:text-5xl font-bold leading-tight; }
+  h2 { @apply text-2xl sm:text-3xl font-semibold leading-snug; }
+  h3 { @apply text-xl sm:text-2xl font-semibold; }
+  h4 { @apply text-lg sm:text-xl font-semibold; }
 
   * { @apply box-border; }
   ::selection { background: rgba(201,168,76,0.3); }
@@ -124,7 +124,14 @@
   /* Section headings */
   .section-heading {
     font-family: var(--font-display);
-    @apply text-3xl lg:text-4xl font-bold text-navy text-center uppercase tracking-widest;
+    @apply text-2xl sm:text-3xl lg:text-4xl font-bold text-navy text-center uppercase tracking-wider sm:tracking-widest;
+  }
+
+  /* Hero title on interior pages. Cinzel + wide tracking overflows narrow
+     phones at the old fixed text-4xl, so both step down together. */
+  .page-title {
+    @apply text-2xl sm:text-4xl lg:text-5xl font-bold uppercase
+           tracking-wider sm:tracking-widest break-words;
   }
 
   .section-label {
@@ -266,4 +273,48 @@
     background: rgba(201,168,76,0.4);
     border-radius: 99px;
   }
+}
+
+/* --- Google Translate widget suppression -------------------------- *
+ * The widget is driven from our own navbar control (see
+ * lib/translate.js + components/ui/LanguageSwitcher.jsx), so every piece of
+ * Google's stock UI is hidden. Left visible, the banner iframe injects
+ * `top: 40px` onto <body> and pushes the fixed navbar off-screen.
+ * These rules sit outside @layer so they always outrank Tailwind utilities.
+ * ------------------------------------------------------------------ */
+
+/* Parked off-screen rather than display:none — the widget must stay laid out
+ * for it to build its language list, which we read to filter the menu. */
+#google_translate_host {
+  position: absolute !important;
+  left: -10000px !important;
+  top: 0 !important;
+  width: 1px !important;
+  height: 1px !important;
+  overflow: hidden !important;
+}
+
+.goog-te-banner-frame,
+.skiptranslate iframe,
+iframe.skiptranslate {
+  display: none !important;
+  visibility: hidden !important;
+  height: 0 !important;
+}
+
+body {
+  top: 0 !important;
+  position: static !important;
+}
+
+/* Translated spans get a highlight + hover balloon by default. */
+.goog-text-highlight {
+  background: none !important;
+  box-shadow: none !important;
+}
+
+#goog-gt-tt,
+.goog-tooltip,
+.goog-tooltip:hover {
+  display: none !important;
 }

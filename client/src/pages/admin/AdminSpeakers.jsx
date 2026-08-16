@@ -3,27 +3,26 @@
  * CRUD table for conference speakers.
  */
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Upload, Trash2, Link as LinkIcon } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import api, { assetUrl } from '../../lib/api';
 import RichTextEditor from '../../components/ui/RichTextEditor';
+import FilterBar from '../../components/admin/FilterBar';
+import { SPEAKER_SECTIONS, sectionLabel } from '../../lib/speakerSections';
+import { inDateRange } from '../../lib/utils';
 
 const EMPTY = {
   name: '', designation: '', church: '', country: '', bio: '', photo_url: '',
   keynote: false, category: 'speaker', display_order: 0,
 };
 
-/** Headings the public Speakers page groups people under. */
-const CATEGORIES = [
-  { value: 'speaker',   label: 'Speakers' },
-  { value: 'host',      label: 'Host' },
-  { value: 'secretary', label: 'Secretariat' },
-];
+const BLANK_FILTERS = { search: '', category: '', keynote: '', profile: '', from: '', to: '' };
 
 export default function AdminSpeakers() {
   const { token } = useAuth();
   const [speakers, setSpeakers] = useState([]);
+  const [filters, setFilters] = useState(BLANK_FILTERS);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(null); // null | 'add' | 'edit'
   const [form, setForm] = useState(EMPTY);
@@ -39,13 +38,34 @@ export default function AdminSpeakers() {
   const load = () => {
     setLoading(true);
     setLoadError('');
-    api.get('/speakers')
+    // The admin route returns the full row (created_at included) so the
+    // "added" date filter has something to work with.
+    api.get('/admin/speakers', { headers })
       .then((r) => setSpeakers(r.data))
       .catch(() => setLoadError('Unable to load speakers. Please ensure the API server is running.'))
       .finally(() => setLoading(false));
   };
 
   useEffect(() => { load(); }, []);
+
+  const setFilter = (key, value) => setFilters((f) => ({ ...f, [key]: value }));
+  const filtersActive = Object.values(filters).some(Boolean);
+
+  const visible = useMemo(() => {
+    const term = filters.search.trim().toLowerCase();
+
+    return speakers.filter((s) => {
+      if (term && ![s.name, s.designation, s.church, s.country]
+        .some((f) => (f || '').toLowerCase().includes(term))) return false;
+      if (filters.category && (s.category || 'speaker') !== filters.category) return false;
+      if (filters.keynote === 'yes' && !s.keynote) return false;
+      if (filters.keynote === 'no' && s.keynote) return false;
+      if (filters.profile === 'complete' && !s.bio?.trim()) return false;
+      if (filters.profile === 'pending' && s.bio?.trim()) return false;
+      if (!inDateRange(s.created_at, filters.from, filters.to)) return false;
+      return true;
+    });
+  }, [speakers, filters]);
 
   const openAdd = () => { setForm(EMPTY); setError(''); setShowUrlField(false); setModal('add'); };
   const openEdit = (s) => {
@@ -113,12 +133,59 @@ export default function AdminSpeakers() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <h2 style={{ fontFamily: 'Cinzel, serif', color: 'var(--color-navy)' }} className="text-xl font-bold uppercase tracking-wide">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
+        <h2 style={{ fontFamily: 'Cinzel, serif', color: 'var(--color-navy)' }} className="text-lg sm:text-xl font-bold uppercase tracking-wide">
           Speakers
         </h2>
         <button className="btn-gold text-sm px-5 py-2" onClick={openAdd}>+ Add Speaker</button>
       </div>
+
+      <FilterBar
+        search={filters.search}
+        onSearchChange={(v) => setFilter('search', v)}
+        searchPlaceholder="Search name, designation, church or country…"
+        selects={[
+          {
+            label: 'Section',
+            value: filters.category,
+            onChange: (v) => setFilter('category', v),
+            options: [
+              { value: '', label: 'All sections' },
+              ...SPEAKER_SECTIONS.map((s) => ({ value: s.key, label: s.title })),
+            ],
+          },
+          {
+            label: 'Keynote',
+            value: filters.keynote,
+            onChange: (v) => setFilter('keynote', v),
+            options: [
+              { value: '', label: 'Keynote: any' },
+              { value: 'yes', label: 'Keynote only' },
+              { value: 'no', label: 'Not keynote' },
+            ],
+          },
+          {
+            label: 'Profile',
+            value: filters.profile,
+            onChange: (v) => setFilter('profile', v),
+            options: [
+              { value: '', label: 'Profile: any' },
+              { value: 'complete', label: 'Bio written' },
+              { value: 'pending', label: 'Bio outstanding' },
+            ],
+          },
+        ]}
+        dateRange={{
+          label: 'Added',
+          from: filters.from,
+          to: filters.to,
+          onFromChange: (v) => setFilter('from', v),
+          onToChange: (v) => setFilter('to', v),
+        }}
+        active={filtersActive}
+        onReset={() => setFilters(BLANK_FILTERS)}
+        summary={filtersActive ? `Showing ${visible.length} of ${speakers.length} people` : `${speakers.length} people`}
+      />
 
       {loadError && (
         <div className="rounded-xl border border-red-200 bg-red-50 p-4 mb-4 text-sm text-red-700">
@@ -129,40 +196,47 @@ export default function AdminSpeakers() {
       {loading ? (
         <div className="flex justify-center py-20"><div className="w-6 h-6 rounded-full border-2 border-gold border-t-transparent animate-spin" /></div>
       ) : (
-        <div className="bg-white rounded-xl border border-[#e8e0d0] overflow-hidden">
-          <table className="w-full text-sm font-body">
+        <div className="bg-white rounded-xl border border-[#e8e0d0] overflow-x-auto">
+          <table className="w-full text-sm font-body min-w-[34rem]">
             <thead>
               <tr style={{ background: 'var(--color-cream-dark)' }}>
                 <th className="text-left px-4 py-3 font-semibold" style={{ color: 'var(--color-navy)' }}>Name</th>
                 <th className="text-left px-4 py-3 font-semibold hidden sm:table-cell" style={{ color: 'var(--color-navy)' }}>Church</th>
                 <th className="text-left px-4 py-3 font-semibold hidden md:table-cell" style={{ color: 'var(--color-navy)' }}>Country</th>
-                <th className="text-left px-4 py-3 font-semibold hidden md:table-cell" style={{ color: 'var(--color-navy)' }}>Section</th>
-                <th className="text-center px-4 py-3 font-semibold" style={{ color: 'var(--color-navy)' }}>Keynote</th>
+                <th className="text-left px-4 py-3 font-semibold" style={{ color: 'var(--color-navy)' }}>Section</th>
+                <th className="text-center px-4 py-3 font-semibold hidden sm:table-cell" style={{ color: 'var(--color-navy)' }}>Keynote</th>
                 <th className="text-right px-4 py-3" />
               </tr>
             </thead>
             <tbody>
-              {speakers.map((s, i) => (
+              {visible.map((s, i) => (
                 <tr key={s.id} className={i % 2 === 0 ? '' : 'bg-gray-50'}>
                   <td className="px-4 py-3 font-medium" style={{ color: 'var(--color-charcoal)' }}>
-                    {s.designation} {s.name}
+                    {s.designation && (
+                      <span className="block text-[10px] font-semibold uppercase tracking-wider text-gold mb-0.5">
+                        {s.designation}
+                      </span>
+                    )}
+                    {s.name}
                   </td>
                   <td className="px-4 py-3 text-gray-500 hidden sm:table-cell">{s.church}</td>
                   <td className="px-4 py-3 text-gray-500 hidden md:table-cell">{s.country}</td>
-                  <td className="px-4 py-3 text-gray-500 hidden md:table-cell">
-                    {CATEGORIES.find((c) => c.value === (s.category || 'speaker'))?.label}
-                  </td>
-                  <td className="px-4 py-3 text-center">
+                  <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{sectionLabel(s.category || 'speaker')}</td>
+                  <td className="px-4 py-3 text-center hidden sm:table-cell">
                     {s.keynote ? <span className="badge-gold">Yes</span> : <span className="text-gray-300">—</span>}
                   </td>
-                  <td className="px-4 py-3 text-right">
+                  <td className="px-4 py-3 text-right whitespace-nowrap">
                     <button onClick={() => openEdit(s)} className="text-navy hover:text-gold transition-colors text-xs font-semibold mr-3">Edit</button>
                     <button onClick={() => handleDelete(s.id)} className="text-red-400 hover:text-red-600 transition-colors text-xs font-semibold">Delete</button>
                   </td>
                 </tr>
               ))}
-              {!speakers.length && (
-                <tr><td colSpan={6} className="px-4 py-10 text-center text-gray-400 font-body">No speakers yet. Add one above.</td></tr>
+              {!visible.length && (
+                <tr>
+                  <td colSpan={6} className="px-4 py-10 text-center text-gray-400 font-body">
+                    {speakers.length ? 'No one matches these filters.' : 'No speakers yet. Add one above.'}
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>
@@ -181,7 +255,7 @@ export default function AdminSpeakers() {
               {modal === 'add' ? 'Add Speaker' : 'Edit Speaker'}
             </h3>
             <form onSubmit={handleSave} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="form-label">Name *</label>
                   <input className="form-input" value={form.name} onChange={e => setForm({...form, name: e.target.value})} required />
@@ -271,7 +345,7 @@ export default function AdminSpeakers() {
                   </div>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="form-label">Section</label>
                   <select
@@ -279,7 +353,7 @@ export default function AdminSpeakers() {
                     value={form.category || 'speaker'}
                     onChange={e => setForm({ ...form, category: e.target.value })}
                   >
-                    {CATEGORIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+                    {SPEAKER_SECTIONS.map((c) => <option key={c.key} value={c.key}>{c.title}</option>)}
                   </select>
                 </div>
                 <div>

@@ -216,7 +216,7 @@ export default function PaymentStep({ formData, registrationRef, onInitiate, onB
           </dl>
           <p className="font-body text-xs pt-2 border-t" style={{ borderColor: '#e5e7eb', color: 'var(--color-muted)' }}>
             After payment, email your proof of payment to{' '}
-            <a href="mailto:conference@africamethodistcouncil.org" className="underline" style={{ color: 'var(--color-navy)' }}>
+            <a href="mailto:conference@africamethodistcouncil.org" className="underline break-words" style={{ color: 'var(--color-navy)' }}>
               conference@africamethodistcouncil.org
             </a>{' '}
             with your registration reference in the subject line. Your registration will be confirmed within 24 hours.

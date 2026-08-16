@@ -28,7 +28,7 @@ export default function Venue() {
         <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, rgba(15,30,51,0.65), rgba(15,30,51,0.9))" }} />
         <div className="section-container text-center relative z-10 pt-6">
           <span className="section-label">AMC 2027</span>
-          <h1 style={{ fontFamily: "Cinzel, serif" }} className="text-4xl lg:text-5xl font-bold text-white uppercase tracking-widest mb-3">Venue & Travel</h1>
+          <h1 style={{ fontFamily: "Cinzel, serif" }} className="page-title text-white mb-3">Venue & Travel</h1>
           <div style={{ height: "3px", width: "48px", background: "var(--gold-gradient)", margin: "0 auto" }} className="rounded-full" />
           <p className="font-body text-white/60 text-sm mt-3">Harare, Zimbabwe &middot; March 2027</p>
         </div>
@@ -42,7 +42,7 @@ export default function Venue() {
             <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
               <div>
                 <p className="text-[11px] font-body font-semibold uppercase tracking-[0.3em] text-[#c9a84c]">Conference Venue</p>
-                <h2 style={{ fontFamily: "Cinzel, serif" }} className="text-2xl font-bold text-navy mt-1 uppercase tracking-wide">Where the event comes to life</h2>
+                <h2 style={{ fontFamily: "Cinzel, serif" }} className="text-xl sm:text-2xl font-bold text-navy mt-1 uppercase tracking-wide">Where the event comes to life</h2>
               </div>
               <div className="rounded-full border border-[#e7dfcf] bg-white/80 px-3 py-1.5 text-[11px] font-body font-semibold uppercase tracking-[0.2em] text-[#556172]">Harare • 2027</div>
             </div>
@@ -103,9 +103,9 @@ export default function Venue() {
 
           {/* Accommodation */}
           <section className="space-y-6">
-            <div className="rounded-[32px] border border-[#ebe4d7] bg-[linear-gradient(145deg,#ffffff_0%,#fcfbf8_100%)] p-6 shadow-[0_20px_60px_rgba(15,30,51,0.06)]">
+            <div className="rounded-[32px] border border-[#ebe4d7] bg-[linear-gradient(145deg,#ffffff_0%,#fcfbf8_100%)] p-5 sm:p-6 shadow-[0_20px_60px_rgba(15,30,51,0.06)]">
               <p className="text-[11px] font-body font-semibold uppercase tracking-[0.3em] text-[#c9a84c]">Accommodation</p>
-              <h2 style={{ fontFamily: "Cinzel, serif" }} className="text-2xl font-bold text-navy mt-1 uppercase tracking-wide">Stay close to the action</h2>
+              <h2 style={{ fontFamily: "Cinzel, serif" }} className="text-xl sm:text-2xl font-bold text-navy mt-1 uppercase tracking-wide">Stay close to the action</h2>
 
               <div className="mt-5 rounded-[24px] p-5" style={{ background: "linear-gradient(135deg, rgba(201,168,76,0.14), rgba(201,168,76,0.04))", border: "1px solid rgba(201,168,76,0.25)" }}>
                 <p className="font-body font-bold text-navy text-sm mb-1 uppercase tracking-wider">Conference Rate &mdash; Rainbow Towers</p>
@@ -114,7 +114,7 @@ export default function Venue() {
               </div>
             </div>
 
-            <div className="rounded-[32px] border border-[#ebe4d7] bg-[linear-gradient(145deg,#ffffff_0%,#fcfbf8_100%)] p-6 shadow-[0_20px_60px_rgba(15,30,51,0.06)]">
+            <div className="rounded-[32px] border border-[#ebe4d7] bg-[linear-gradient(145deg,#ffffff_0%,#fcfbf8_100%)] p-5 sm:p-6 shadow-[0_20px_60px_rgba(15,30,51,0.06)]">
               <div className="flex items-center justify-between gap-3 mb-4">
                 <h3 style={{ fontFamily: "Cinzel, serif" }} className="font-bold text-navy text-base uppercase tracking-wider">Nearby Hotels</h3>
                 <span className="rounded-full bg-[#f6efe2] px-2.5 py-1 text-[11px] font-body font-semibold uppercase tracking-[0.2em] text-[#6b5b2d]">Curated picks</span>
@@ -165,7 +165,7 @@ export default function Venue() {
         <section className="mt-6 rounded-[32px] border border-[#ebe4d7] bg-[linear-gradient(145deg,#ffffff_0%,#fcfbf8_100%)] p-5 sm:p-6 shadow-[0_20px_60px_rgba(15,30,51,0.06)]">
           <div className="mb-5">
             <p className="text-[11px] font-body font-semibold uppercase tracking-[0.3em] text-[#c9a84c]">Travel & Visa</p>
-            <h2 style={{ fontFamily: "Cinzel, serif" }} className="text-2xl font-bold text-navy mt-1 uppercase tracking-wide">Everything you need to arrive with ease</h2>
+            <h2 style={{ fontFamily: "Cinzel, serif" }} className="text-xl sm:text-2xl font-bold text-navy mt-1 uppercase tracking-wide">Everything you need to arrive with ease</h2>
           </div>
           <div className="grid gap-4 lg:grid-cols-3">
             {[
@@ -181,7 +181,7 @@ export default function Venue() {
                     <p className="font-body text-gray-600 text-sm leading-relaxed mb-3">Citizens of many African countries and some other nations can visit Zimbabwe visa-free or obtain a visa on arrival. An official visa support letter will be provided to registered delegates upon request.</p>
                     <p className="font-body text-sm font-semibold" style={{ color: "var(--color-navy)" }}>
                       To request a visa support letter, contact:{" "}
-                      <a href="mailto:conference@africamethodistcouncil.org" className="underline hover:text-gold">conference@africamethodistcouncil.org</a>
+                      <a href="mailto:conference@africamethodistcouncil.org" className="underline hover:text-gold break-words">conference@africamethodistcouncil.org</a>
                     </p>
                   </div>
                 ),
@@ -191,7 +191,7 @@ export default function Venue() {
                 content: "Zimbabwe uses both the US Dollar (USD) and the Zimbabwe Gold (ZiG) currency. USD is widely accepted at hotels and conference facilities. ATMs are available at the airport and throughout the city.",
               },
             ].map(({ Icon, title, content, extra }) => (
-              <div key={title} className="rounded-[24px] border border-[#ece4d4] bg-[linear-gradient(135deg,#ffffff_0%,#fbf8f0_100%)] p-6 shadow-[0_8px_25px_rgba(15,30,51,0.04)]">
+              <div key={title} className="min-w-0 rounded-[24px] border border-[#ece4d4] bg-[linear-gradient(135deg,#ffffff_0%,#fbf8f0_100%)] p-5 sm:p-6 shadow-[0_8px_25px_rgba(15,30,51,0.04)]">
                 <div className="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0"
                   style={{ background: "rgba(201,168,76,0.12)", border: "1px solid rgba(201,168,76,0.25)" }}>
                   <Icon size={18} style={{ color: "var(--color-gold)" }} />

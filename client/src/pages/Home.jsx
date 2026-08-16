@@ -46,7 +46,7 @@ export default function Home() {
           <div className="absolute top-0 left-1/4 w-px h-full" style={{ background: "linear-gradient(to bottom, transparent, rgba(201,168,76,0.6), transparent)" }} />
           <div className="absolute top-0 right-1/4 w-px h-full" style={{ background: "linear-gradient(to bottom, transparent, rgba(201,168,76,0.3), transparent)" }} />
         </div>
-        <div className="section-container relative z-10 py-32 text-center">
+        <div className="section-container relative z-10 py-24 sm:py-32 text-center">
           <a href="https://africamethodistcouncil.org" target="_blank" rel="noopener noreferrer"
             className="inline-flex items-center gap-2 rounded-full px-5 py-2 text-xs font-body font-semibold text-white/60 hover:text-white transition-all duration-200 mb-10 group"
             style={{ border: "1px solid rgba(255,255,255,0.15)", background: "rgba(255,255,255,0.06)", backdropFilter: "blur(8px)" }}>
@@ -62,12 +62,12 @@ export default function Home() {
           <p className="text-xs font-body font-bold uppercase tracking-[0.3em] mb-4 animate-fade-up" style={{ color: "var(--color-gold)" }}>
             Africa Methodist Council &middot; 3rd General Conference
           </p>
-          <h1 className="text-5xl sm:text-6xl lg:text-7xl xl:text-8xl font-bold text-white leading-tight tracking-wide mb-5 animate-fade-up"
+          <h1 className="text-4xl sm:text-6xl lg:text-7xl xl:text-8xl font-bold text-white leading-tight tracking-wide mb-5 animate-fade-up"
             style={{ fontFamily: "Cinzel, serif" }}>
             AMC Conference<br />
             <span className="inline-block" style={{ color: "#f2d37a", textShadow: "0 0 24px rgba(242, 211, 122, 0.35)", display: "inline-block" }}>2027</span>
           </h1>
-          <p className="text-white/70 text-2xl lg:text-3xl italic mb-2 animate-fade-up" style={{ fontFamily: "Cormorant Garamond, serif" }}>
+          <p className="text-white/70 text-lg sm:text-2xl lg:text-3xl italic mb-2 animate-fade-up" style={{ fontFamily: "Cormorant Garamond, serif" }}>
             "Equipped to transform Africa's sociopolitical and economic landscape"
           </p>
           <p className="font-body font-semibold text-sm mb-14 animate-fade-up" style={{ color: "var(--color-gold)" }}>
@@ -75,11 +75,11 @@ export default function Home() {
           </p>
           <div className="mb-14 animate-fade-up"><CountdownTimer /></div>
           <div className="flex flex-col sm:flex-row gap-4 justify-center animate-fade-up">
-            <Link to="/register" className="inline-flex items-center justify-center gap-2 text-base px-10 py-4 rounded-xl font-body font-bold transition-all duration-200 hover:-translate-y-0.5"
+            <Link to="/register" className="inline-flex items-center justify-center gap-2 text-sm sm:text-base px-8 sm:px-10 py-4 rounded-xl font-body font-bold transition-all duration-200 hover:-translate-y-0.5"
               style={{ background: "var(--gold-gradient)", color: "var(--color-navy)", boxShadow: "0 4px 20px rgba(201,168,76,0.4)" }}>
               Register Now <ArrowRight size={18} />
             </Link>
-            <Link to="/schedule" className="inline-flex items-center justify-center gap-2 text-base px-10 py-4 rounded-xl font-body font-semibold transition-all duration-200 hover:bg-white/10"
+            <Link to="/schedule" className="inline-flex items-center justify-center gap-2 text-sm sm:text-base px-8 sm:px-10 py-4 rounded-xl font-body font-semibold transition-all duration-200 hover:bg-white/10"
               style={{ border: "2px solid rgba(255,255,255,0.3)", color: "white" }}>
               <Calendar size={16} /> View Schedule
             </Link>
@@ -104,7 +104,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="py-24" style={{ background: "var(--color-cream)" }}>
+      <section className="py-16 sm:py-24" style={{ background: "var(--color-cream)" }}>
         <div className="section-container">
           <div className="max-w-2xl mx-auto text-center mb-14">
             <span className="section-label">Conference Highlights</span>
@@ -133,7 +133,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="py-24" style={{ background: "var(--color-cream-dark)" }}>
+      <section className="py-16 sm:py-24" style={{ background: "var(--color-cream-dark)" }}>
         <div className="section-container">
           <div className="grid grid-cols-1 lg:grid-cols-[1.15fr_0.85fr] gap-8 items-center">
             <div className="relative overflow-hidden rounded-[2rem] min-h-[430px] animate-fade-up" style={{ boxShadow: "var(--shadow-card)" }}>
@@ -166,7 +166,7 @@ export default function Home() {
         <div className="section-container max-w-3xl mx-auto text-center relative z-10">
           <span className="section-label" style={{ color: "rgba(201,168,76,0.8)" }}>Conference Theme</span>
           <div style={{ height: "2px", width: "48px", background: "var(--gold-gradient)", margin: "1.5rem auto 2rem" }} className="rounded-full" />
-          <blockquote style={{ fontFamily: "Cormorant Garamond, serif", color: "white" }} className="text-3xl lg:text-4xl italic font-medium mb-4 leading-relaxed">
+          <blockquote style={{ fontFamily: "Cormorant Garamond, serif", color: "white" }} className="text-xl sm:text-3xl lg:text-4xl italic font-medium mb-4 leading-relaxed">
             "Equipped to transform,<br />Africa's sociopolitical and economic landscape"
           </blockquote>
           <p className="font-body font-semibold text-sm mb-8" style={{ color: "var(--color-gold)" }}>Isaiah 61:1</p>
@@ -176,7 +176,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="py-24" style={{ background: "var(--color-cream-dark)" }}>
+      <section className="py-16 sm:py-24" style={{ background: "var(--color-cream-dark)" }}>
         <div className="section-container">
           <div className="max-w-xl mx-auto text-center mb-14">
             <span className="section-label">Navigation</span>
@@ -233,16 +233,16 @@ export default function Home() {
 
       <section className="py-20 relative overflow-hidden" style={{ background: "var(--navy-gradient)" }}>
         <div className="section-container text-center relative z-10">
-          <h2 style={{ fontFamily: "Cinzel, serif" }} className="text-3xl lg:text-4xl font-bold text-white uppercase tracking-widest mb-4">Join Us in Harare</h2>
-          <p style={{ fontFamily: "Cormorant Garamond, serif" }} className="text-white/70 text-xl italic mb-8">
+          <h2 style={{ fontFamily: "Cinzel, serif" }} className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white uppercase tracking-wider sm:tracking-widest mb-4">Join Us in Harare</h2>
+          <p style={{ fontFamily: "Cormorant Garamond, serif" }} className="text-white/70 text-base sm:text-xl italic mb-8">
             March 9&ndash;14, 2027 &middot; Rainbow Towers Hotel &amp; Conference Centre
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link to="/register" className="inline-flex items-center justify-center gap-2 text-base px-10 py-4 rounded-xl font-body font-bold transition-all duration-200 hover:-translate-y-0.5"
+            <Link to="/register" className="inline-flex items-center justify-center gap-2 text-sm sm:text-base px-8 sm:px-10 py-4 rounded-xl font-body font-bold transition-all duration-200 hover:-translate-y-0.5"
               style={{ background: "var(--gold-gradient)", color: "var(--color-navy)", boxShadow: "0 4px 20px rgba(201,168,76,0.4)" }}>
               Register Now <ArrowRight size={18} />
             </Link>
-            <Link to="/about" className="inline-flex items-center justify-center gap-2 text-base px-10 py-4 rounded-xl font-body font-semibold transition-all duration-200 hover:bg-white/10"
+            <Link to="/about" className="inline-flex items-center justify-center gap-2 text-sm sm:text-base px-8 sm:px-10 py-4 rounded-xl font-body font-semibold transition-all duration-200 hover:bg-white/10"
               style={{ border: "2px solid rgba(255,255,255,0.3)", color: "white" }}>
               Learn More
             </Link>

@@ -15,9 +15,11 @@ function getTimeLeft() {
 
 function Unit({ value, label }) {
   return (
-    <div className="flex flex-col items-center gap-2">
+    <div className="flex flex-col items-center gap-2 min-w-0">
+      {/* Full-width inside its grid cell on phones; fixed width once the row
+          has space for the separators from `sm` up. */}
       <div
-        className="relative min-w-[76px] sm:min-w-[88px] text-center px-4 py-4 rounded-2xl overflow-hidden"
+        className="relative w-full sm:w-auto sm:min-w-[88px] text-center px-1.5 sm:px-4 py-3 sm:py-4 rounded-xl sm:rounded-2xl overflow-hidden"
         style={{
           background: "rgba(255,255,255,0.08)",
           border: "1px solid rgba(201,168,76,0.3)",
@@ -29,7 +31,7 @@ function Unit({ value, label }) {
         <div className="absolute top-0 left-0 right-0 h-px" style={{ background: "rgba(201,168,76,0.4)" }} />
         <span
           style={{ fontFamily: "Cinzel, serif" }}
-          className="text-5xl sm:text-6xl font-bold text-white leading-none tracking-wide tabular-nums"
+          className="text-[2rem] sm:text-6xl font-bold text-white leading-none tracking-wide tabular-nums"
         >
           {String(value).padStart(2, "0")}
         </span>
@@ -43,7 +45,7 @@ function Unit({ value, label }) {
 
 function Separator() {
   return (
-    <div className="flex flex-col gap-2 mb-6 pb-1">
+    <div className="hidden sm:flex flex-col gap-2 mb-6 pb-1">
       <div className="w-1 h-1 rounded-full" style={{ background: "rgba(201,168,76,0.5)" }} />
       <div className="w-1 h-1 rounded-full" style={{ background: "rgba(201,168,76,0.5)" }} />
     </div>
@@ -60,14 +62,14 @@ export default function CountdownTimer() {
 
   if (!time) {
     return (
-      <div style={{ fontFamily: "Cinzel, serif" }} className="text-gold text-2xl font-bold tracking-widest uppercase text-center">
+      <div style={{ fontFamily: "Cinzel, serif" }} className="text-gold text-xl sm:text-2xl font-bold tracking-widest uppercase text-center">
         The Conference is Underway!
       </div>
     );
   }
 
   return (
-    <div className="flex justify-center items-end gap-3 sm:gap-5">
+    <div className="grid grid-cols-4 gap-2 sm:flex sm:justify-center sm:items-end sm:gap-5">
       <Unit value={time.days}    label="Days" />
       <Separator />
       <Unit value={time.hours}   label="Hours" />
