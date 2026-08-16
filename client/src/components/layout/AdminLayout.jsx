@@ -3,7 +3,9 @@
  * Sidebar + header shell for all admin pages.
  */
 
-import { Outlet, NavLink, useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
+import { Menu, X } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 
 // SVG icon components — avoids emoji encoding issues
@@ -34,6 +36,11 @@ const ADMIN_NAV = [
 export default function AdminLayout() {
   const { admin, logout } = useAuth();
   const navigate = useNavigate();
+  const { pathname } = useLocation();
+
+  // Below lg the sidebar is an off-canvas drawer; picking a page closes it.
+  const [navOpen, setNavOpen] = useState(false);
+  useEffect(() => { setNavOpen(false); }, [pathname]);
 
   const handleSignOut = () => {
     logout();
@@ -41,17 +48,40 @@ export default function AdminLayout() {
   };
 
   return (
-    <div className="min-h-screen flex" style={{ background: '#f4f6f8' }}>
+    <div className="min-h-screen lg:flex" style={{ background: '#f4f6f8' }}>
+      {/* Scrim — only ever visible while the mobile drawer is open */}
+      {navOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+          onClick={() => setNavOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
       {/* Sidebar */}
-      <aside className="w-60 flex-shrink-0 flex flex-col" style={{ background: 'var(--color-navy)' }}>
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 w-60 flex-shrink-0 flex flex-col transition-transform duration-300
+                    lg:static lg:z-auto lg:translate-x-0
+                    ${navOpen ? 'translate-x-0' : '-translate-x-full'}`}
+        style={{ background: 'var(--color-navy)' }}
+      >
         {/* Brand */}
-        <div className="p-5 border-b border-white/10">
-          <div style={{ fontFamily: 'Cinzel, serif' }} className="text-gold font-bold text-sm tracking-widest uppercase">AMC 2027</div>
-          <div className="text-white/50 text-xs mt-0.5 font-body">Admin Dashboard</div>
+        <div className="p-5 border-b border-white/10 flex items-start justify-between gap-2">
+          <div>
+            <div style={{ fontFamily: 'Cinzel, serif' }} className="text-gold font-bold text-sm tracking-widest uppercase">AMC 2027</div>
+            <div className="text-white/50 text-xs mt-0.5 font-body">Admin Dashboard</div>
+          </div>
+          <button
+            className="lg:hidden text-white/60 hover:text-white p-1 -mr-1"
+            onClick={() => setNavOpen(false)}
+            aria-label="Close menu"
+          >
+            <X size={20} />
+          </button>
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 p-3 space-y-0.5">
+        <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto scrollbar-thin">
           {ADMIN_NAV.map(({ to, label, Icon, exact }) => (
             <NavLink
               key={to}
@@ -87,27 +117,37 @@ export default function AdminLayout() {
       </aside>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col min-h-screen overflow-hidden">
+      <div className="flex-1 min-w-0 flex flex-col min-h-screen">
         {/* Top bar */}
-        <header className="bg-white border-b border-gray-200 px-6 py-4">
-          <div className="flex items-center justify-between">
-            <h1 style={{ fontFamily: 'Cinzel, serif' }} className="text-navy text-base font-bold tracking-wide uppercase">
-              AMC 2027 Conference Administration
-            </h1>
-            <div className="flex items-center gap-2 font-body text-sm text-gray-600">
+        <header className="bg-white border-b border-gray-200 px-4 sm:px-6 py-3 sm:py-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <button
+                className="lg:hidden -ml-1 p-2 rounded-lg text-navy hover:bg-gray-100 transition-colors flex-shrink-0"
+                onClick={() => setNavOpen(true)}
+                aria-label="Open menu"
+              >
+                <Menu size={20} />
+              </button>
+              <h1 style={{ fontFamily: 'Cinzel, serif' }} className="text-navy text-sm sm:text-base font-bold tracking-wide uppercase truncate">
+                <span className="hidden sm:inline">AMC 2027 Conference Administration</span>
+                <span className="sm:hidden">AMC 2027 Admin</span>
+              </h1>
+            </div>
+            <div className="flex items-center gap-2 font-body text-sm text-gray-600 flex-shrink-0">
               <div
-                className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs"
+                className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs flex-shrink-0"
                 style={{ background: 'var(--color-navy)', color: 'var(--color-gold)' }}
               >
                 {admin?.name?.[0] || 'A'}
               </div>
-              <span>{admin?.name || 'Admin'}</span>
+              <span className="hidden sm:inline">{admin?.name || 'Admin'}</span>
             </div>
           </div>
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 p-6 overflow-auto">
+        <main className="flex-1 p-4 sm:p-6 min-w-0">
           <Outlet />
         </main>
       </div>

@@ -42,7 +42,9 @@ export default function AdminRegistrations() {
 
   const handleExportCsv = async () => {
     try {
-      const { data } = await adminApi.exportCsv();
+      // Export exactly what the current filters select, not the whole table.
+      const { page: _page, ...exportFilters } = filters;
+      const { data } = await adminApi.exportCsv(exportFilters);
       downloadBlob(data, `amc2027-registrations-${Date.now()}.csv`);
       toast.success('CSV exported.');
     } catch {
@@ -52,9 +54,9 @@ export default function AdminRegistrations() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
         <div>
-          <h2 className="font-heading text-2xl font-bold text-navy">Registrations</h2>
+          <h2 className="font-heading text-xl sm:text-2xl font-bold text-navy">Registrations</h2>
           <p className="text-gray-500 text-sm">{total} total registrations</p>
         </div>
         <button onClick={handleExportCsv} className="btn-primary py-2 px-4 text-sm">

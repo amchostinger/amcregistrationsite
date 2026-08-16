@@ -192,7 +192,7 @@ export default function Schedule() {
       <div className="relative overflow-hidden" style={{ background: "var(--navy-gradient)", paddingTop: "6rem", paddingBottom: "3.5rem", marginTop: "-80px" }}>
         <div className="section-container text-center relative z-10 pt-6">
           <span className="section-label">AMC 2027</span>
-          <h1 style={{ fontFamily: "Cinzel, serif" }} className="text-4xl lg:text-5xl font-bold text-white uppercase tracking-widest mb-3">Conference Schedule</h1>
+          <h1 style={{ fontFamily: "Cinzel, serif" }} className="page-title text-white mb-3">Conference Schedule</h1>
           <div style={{ height: "3px", width: "48px", background: "var(--gold-gradient)", margin: "0 auto" }} className="rounded-full" />
           <p className="font-body text-white/60 text-sm mt-3">March 9–14, 2027 · Harare, Zimbabwe</p>
         </div>
@@ -216,7 +216,7 @@ export default function Schedule() {
 
       <div className="section-container py-10">
         {/* Day Tabs */}
-        <div className="sticky top-[72px] z-30 -mx-4 sm:-mx-6 px-4 sm:px-6 py-3 mb-8"
+        <div className="sticky top-16 lg:top-[72px] z-30 -mx-4 sm:-mx-6 px-4 sm:px-6 py-3 mb-8"
           style={{ background: "var(--color-cream)", borderBottom: "1px solid var(--color-cream-dark)" }}>
           <div className="flex overflow-x-auto gap-2 pb-1" style={{ scrollbarWidth: "none" }}>
             {DAYS.map((day) => (

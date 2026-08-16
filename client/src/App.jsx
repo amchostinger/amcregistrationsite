@@ -111,7 +111,7 @@ export default function App() {
           element={
             <>
               <Navbar />
-              <main>
+              <main className="pt-20">
                 <Hotels />
               </main>
               <Footer />
@@ -123,7 +123,7 @@ export default function App() {
           element={
             <>
               <Navbar />
-              <main>
+              <main className="pt-20">
                 <Resources />
               </main>
               <Footer />

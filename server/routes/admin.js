@@ -82,6 +82,57 @@ router.get('/stats', async (req, res, next) => {
 
 // ─── GET /api/admin/registrations ────────────────────────────────────────────
 
+/**
+ * A date-range bound arrives from <input type="date"> as YYYY-MM-DD. The "to"
+ * bound is widened to the end of that day so a record saved at 16:40 still
+ * falls inside a range that ends on its own date.
+ */
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+function dateBound(value, endOfDay) {
+  if (!value || !DATE_ONLY.test(value)) return null;
+  return endOfDay ? `${value} 23:59:59` : `${value} 00:00:00`;
+}
+
+/**
+ * Search + filter clause shared by the registrations list and the CSV export,
+ * so an export always contains exactly the rows the admin is looking at.
+ */
+function registrationFilters(q) {
+  const conditions = ['1=1'];
+  const params = [];
+
+  if (q.search) {
+    conditions.push(`(r.first_name LIKE ? OR r.last_name LIKE ? OR r.email LIKE ?
+                      OR r.registration_ref LIKE ? OR r.phone LIKE ?
+                      OR r.church LIKE ? OR r.country LIKE ?)`);
+    const s = `%${q.search}%`;
+    params.push(s, s, s, s, s, s, s);
+  }
+  if (q.status) {
+    conditions.push('r.registration_status = ?');
+    params.push(q.status);
+  }
+  if (q.category) {
+    conditions.push('r.category = ?');
+    params.push(q.category);
+  }
+  if (q.payment_status) {
+    conditions.push('r.payment_status = ?');
+    params.push(q.payment_status);
+  }
+  if (q.country) {
+    conditions.push('r.country = ?');
+    params.push(q.country);
+  }
+
+  const from = dateBound(q.date_from, false);
+  const to = dateBound(q.date_to, true);
+  if (from) { conditions.push('r.created_at >= ?'); params.push(from); }
+  if (to) { conditions.push('r.created_at <= ?'); params.push(to); }
+
+  return { where: conditions.join(' AND '), params };
+}
+
 router.get('/registrations', async (req, res, next) => {
   try {
     const pageValue = parseInt(req.query.page || '1', 10);
@@ -89,30 +140,8 @@ router.get('/registrations', async (req, res, next) => {
     const page = Number.isInteger(pageValue) && pageValue > 0 ? pageValue : 1;
     const limit = Number.isInteger(limitValue) && limitValue > 0 ? Math.min(100, limitValue) : 20;
     const offset = (page - 1) * limit;
-    const { search, status, category, payment_status } = req.query;
 
-    const conditions = ['1=1'];
-    const params = [];
-
-    if (search) {
-      conditions.push('(r.first_name LIKE ? OR r.last_name LIKE ? OR r.email LIKE ? OR r.registration_ref LIKE ?)');
-      const s = `%${search}%`;
-      params.push(s, s, s, s);
-    }
-    if (status) {
-      conditions.push('r.registration_status = ?');
-      params.push(status);
-    }
-    if (category) {
-      conditions.push('r.category = ?');
-      params.push(category);
-    }
-    if (payment_status) {
-      conditions.push('r.payment_status = ?');
-      params.push(payment_status);
-    }
-
-    const where = conditions.join(' AND ');
+    const { where, params } = registrationFilters(req.query);
 
     const [countRows] = await query(
       `SELECT COUNT(*) AS total FROM registrants r WHERE ${where}`,
@@ -201,20 +230,46 @@ router.get('/payments', async (req, res, next) => {
     const page = Number.isInteger(pageValue) && pageValue > 0 ? pageValue : 1;
     const limit = Number.isInteger(limitValue) && limitValue > 0 ? Math.min(100, limitValue) : 20;
     const offset = (page - 1) * limit;
-    const { status } = req.query;
+    const { search, status, method, currency, category, date_from, date_to } = req.query;
 
     const conditions = ['1=1'];
     const params = [];
 
+    if (search) {
+      conditions.push(`(r.registration_ref LIKE ? OR r.first_name LIKE ? OR r.last_name LIKE ?
+                        OR r.email LIKE ? OR p.paynow_reference LIKE ?)`);
+      const s = `%${search}%`;
+      params.push(s, s, s, s, s);
+    }
     if (status) {
       conditions.push('p.status = ?');
       params.push(status);
     }
+    if (method) {
+      conditions.push('p.payment_method = ?');
+      params.push(method);
+    }
+    if (currency) {
+      conditions.push('p.currency = ?');
+      params.push(currency);
+    }
+    if (category) {
+      conditions.push('r.category = ?');
+      params.push(category);
+    }
+
+    const from = dateBound(date_from, false);
+    const to = dateBound(date_to, true);
+    if (from) { conditions.push('p.created_at >= ?'); params.push(from); }
+    if (to) { conditions.push('p.created_at <= ?'); params.push(to); }
 
     const where = conditions.join(' AND ');
 
     const [countRows] = await query(
-      `SELECT COUNT(*) AS total FROM payments p WHERE ${where}`,
+      `SELECT COUNT(*) AS total
+       FROM payments p
+       JOIN registrants r ON r.id = p.registrant_id
+       WHERE ${where}`,
       params
     );
 
@@ -245,6 +300,9 @@ router.get('/payments', async (req, res, next) => {
 
 router.get('/export/csv', async (req, res, next) => {
   try {
+    // Same clause as the list, so "Export CSV" gives back what is on screen.
+    const { where, params } = registrationFilters(req.query);
+
     const [rows] = await query(
       `SELECT r.registration_ref, r.designation, r.first_name, r.last_name,
               r.email, r.phone, r.office, r.category, r.church, r.country,
@@ -257,7 +315,9 @@ router.get('/export/csv', async (req, res, next) => {
               p.amount, p.currency, p.payment_method, p.paid_at
        FROM registrants r
        LEFT JOIN payments p ON p.registrant_id = r.id AND p.status = 'paid'
-       ORDER BY r.created_at DESC`
+       WHERE ${where}
+       ORDER BY r.created_at DESC`,
+      params
     );
 
     const fields = [
@@ -334,7 +394,12 @@ router.get('/speakers', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-const SPEAKER_CATEGORIES = ['speaker', 'host', 'secretary'];
+// Headings the Speakers page groups people under.
+// Mirrors SPEAKER_SECTIONS in client/src/lib/speakerSections.js.
+const SPEAKER_CATEGORIES = [
+  'speaker', 'keynote', 'workshop', 'constitutional',
+  'strategic', 'host', 'secretary', 'awards',
+];
 const speakerCategory = (v) => (SPEAKER_CATEGORIES.includes(v) ? v : 'speaker');
 
 router.post('/speakers', async (req, res, next) => {

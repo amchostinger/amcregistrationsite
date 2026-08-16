@@ -69,6 +69,23 @@ export function getCountdown(targetDate) {
 }
 
 /**
+ * Does `value` fall inside the [from, to] range chosen in a date-range filter?
+ *
+ * `from`/`to` come from <input type="date"> as plain YYYY-MM-DD with no zone,
+ * so they are widened to cover the whole local day — a record created at 16:40
+ * still matches when "to" is set to that same date. An empty bound is open.
+ */
+export function inDateRange(value, from, to) {
+  if (!from && !to) return true;
+  if (!value) return false;
+  const at = new Date(value);
+  if (Number.isNaN(at.getTime())) return false;
+  if (from && at < new Date(`${from}T00:00:00`)) return false;
+  if (to && at > new Date(`${to}T23:59:59.999`)) return false;
+  return true;
+}
+
+/**
  * Trigger a browser CSV download from a Blob.
  */
 export function downloadBlob(blob, filename) {

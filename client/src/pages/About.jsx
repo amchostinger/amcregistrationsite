@@ -26,10 +26,44 @@ const DRESS_ITEMS = [
   { Icon: Church, color: "#7c3aed", bg: "bg-purple-50", border: "border-purple-200", day: "Sunday - Church Services", dress: "Wear church uniforms. Services around Harare" },
 ];
 
+// Initials are explicit rather than derived: several partners share a first
+// word, and the two United Methodist boards are listed as a single partner.
 const PARTNERS = [
-  { name: "Harare Hospitality Group", type: "Accommodation Partner", description: "Supporting delegate stays and welcome services during the conference week.", accent: "#1a2f4e" },
-  { name: "Grace Transit Network", type: "Transport Partner", description: "Providing shuttle coordination and mobility support from the airport and hotels.", accent: "#c9a84c" },
-  { name: "The Lantern Media", type: "Broadcast Partner", description: "Helping share the conference story through digital coverage and live updates.", accent: "#7c3aed" },
+  {
+    name: "Methodist Church in Zimbabwe",
+    initials: "MZ",
+    type: "Host Church",
+    description: "Host of the 3rd General Conference, welcoming delegates to Harare and providing local transport throughout the week.",
+    accent: "#1a2f4e",
+  },
+  {
+    name: "Methodist Church in Britain",
+    initials: "MB",
+    type: "Partner Church",
+    description: "The Methodist connexion in Britain, in partnership with churches across the world Methodist family.",
+    accent: "#8c1c2b",
+  },
+  {
+    name: "General Board of Global Ministries & General Board of Higher Education and Ministry",
+    initials: "UM",
+    type: "United Methodist Church",
+    description: "The mission and the higher education and ministry agencies of the United Methodist Church.",
+    accent: "#c9a84c",
+  },
+  {
+    name: "Kairos Palestine",
+    initials: "KP",
+    type: "Ecumenical Partner",
+    description: "A Christian movement for justice and peace, grounded in the Kairos Palestine document, A Moment of Truth.",
+    accent: "#0f7b6c",
+  },
+  {
+    name: "All We Can",
+    initials: "AW",
+    type: "Development Partner",
+    description: "The international development and relief organisation of the Methodist Church in Britain.",
+    accent: "#7c3aed",
+  },
 ];
 
 export default function About() {
@@ -41,7 +75,7 @@ export default function About() {
         <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, rgba(15,30,51,0.7), rgba(15,30,51,0.85))" }} />
         <div className="section-container text-center relative z-10 pt-8">
           <span className="section-label">AMC 2027</span>
-          <h1 style={{ fontFamily: "Cinzel, serif" }} className="text-4xl lg:text-5xl font-bold text-white uppercase tracking-widest mb-4">About the Conference</h1>
+          <h1 style={{ fontFamily: "Cinzel, serif" }} className="page-title text-white mb-4">About the Conference</h1>
           <div style={{ height: "3px", width: "48px", background: "var(--gold-gradient)", margin: "0 auto" }} className="rounded-full" />
           <p className="font-body text-white/60 text-sm mt-4">3rd General Conference · March 9–14, 2027 · Harare, Zimbabwe</p>
         </div>
@@ -50,8 +84,8 @@ export default function About() {
       <div className="section-container max-w-4xl mx-auto py-16 space-y-14">
 
         {/* Conference Overview */}
-        <section className="rounded-[2rem] p-8 md:p-10 border" style={{ background: "rgba(26,47,78,0.03)", borderColor: "rgba(26,47,78,0.12)", boxShadow: "var(--shadow-xs)" }}>
-          <h2 style={{ fontFamily: "Cinzel, serif" }} className="text-2xl font-bold text-navy mb-5 uppercase tracking-wide">The 3rd General Conference</h2>
+        <section className="rounded-[2rem] p-5 sm:p-8 md:p-10 border" style={{ background: "rgba(26,47,78,0.03)", borderColor: "rgba(26,47,78,0.12)", boxShadow: "var(--shadow-xs)" }}>
+          <h2 style={{ fontFamily: "Cinzel, serif" }} className="text-xl sm:text-2xl font-bold text-navy mb-5 uppercase tracking-wide">The 3rd General Conference</h2>
           <div className="space-y-4 font-body text-gray-600 leading-relaxed">
             <p>The Africa Methodist Council (AMC) 3rd General Conference is the supreme governing body of the Africa Methodist Council, bringing together bishops, presiding prelates, delegates, and invited guests from member churches across Africa and the diaspora.</p>
             <p>Since its inception in 1986, the Africa Methodist Council became fully active in 2015 with the Heads of Conference Summit held in Kumasi, Ghana. The first General Conference was held in 2019 in Kenya, and the second was held in Cotonou, Benin in March 2023.</p>
@@ -60,7 +94,7 @@ export default function About() {
         </section>
 
         {/* Gallery & Experience */}
-        <section className="rounded-[2rem] p-6 md:p-8 bg-white" style={{ border: "1px solid rgba(232,224,208,0.8)", boxShadow: "var(--shadow-card)" }}>
+        <section className="rounded-[2rem] p-5 sm:p-6 md:p-8 bg-white" style={{ border: "1px solid rgba(232,224,208,0.8)", boxShadow: "var(--shadow-card)" }}>
           <div className="grid grid-cols-1 lg:grid-cols-[0.95fr_1.05fr] gap-8 items-center">
             <div className="animate-fade-up">
               <p className="section-label text-left">Gathering in Harare</p>
@@ -87,7 +121,7 @@ export default function About() {
         </section>
 
         {/* Location & Venue */}
-        <section className="rounded-[2rem] p-8 md:p-10 bg-white" style={{ border: "1px solid rgba(232,224,208,0.8)", boxShadow: "var(--shadow-card)", background: "linear-gradient(135deg, rgba(255,255,255,1) 0%, rgba(245,238,220,0.75) 100%)" }}>
+        <section className="rounded-[2rem] p-5 sm:p-8 md:p-10 bg-white" style={{ border: "1px solid rgba(232,224,208,0.8)", boxShadow: "var(--shadow-card)", background: "linear-gradient(135deg, rgba(255,255,255,1) 0%, rgba(245,238,220,0.75) 100%)" }}>
           <h3 style={{ fontFamily: "Cinzel, serif" }} className="text-xl font-bold text-navy mb-6 uppercase tracking-wide">Location & Logistics</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             {[
@@ -114,10 +148,10 @@ export default function About() {
         </section>
 
         {/* Theme */}
-        <section className="rounded-2xl p-8 text-white relative overflow-hidden" style={{ background: "var(--navy-gradient)" }}>
+        <section className="rounded-2xl p-5 sm:p-8 text-white relative overflow-hidden" style={{ background: "var(--navy-gradient)" }}>
           <div className="absolute top-0 right-0 w-64 h-64 rounded-full opacity-5" style={{ background: "var(--gold-gradient)", transform: "translate(30%, -30%)" }} />
           <p className="text-xs font-body font-bold uppercase tracking-widest mb-2" style={{ color: "var(--color-gold)" }}>Conference Theme</p>
-          <h2 style={{ fontFamily: "Cinzel, serif" }} className="text-2xl lg:text-3xl font-bold mb-3 leading-snug">"Equipped to transform Africa's sociopolitical and economic landscape"</h2>
+          <h2 style={{ fontFamily: "Cinzel, serif" }} className="text-xl sm:text-2xl lg:text-3xl font-bold mb-3 leading-snug">"Equipped to transform Africa's sociopolitical and economic landscape"</h2>
           <p className="text-white/60 text-sm mb-5 font-body">— Isaiah 61:1</p>
           <blockquote className="border-l-2 pl-5 italic text-white/75 text-base leading-relaxed font-body" style={{ borderColor: "var(--color-gold)" }}>
             "The Spirit of the Sovereign Lord is on me,
@@ -128,8 +162,8 @@ He has sent me to bind up the brokenhearted, to proclaim freedom for the captive
         </section>
 
         {/* Cost & Registration */}
-        <section className="rounded-[2rem] p-8 md:p-10 border" style={{ background: "rgba(201,168,76,0.08)", borderColor: "rgba(201,168,76,0.2)", boxShadow: "var(--shadow-xs)" }}>
-          <h2 style={{ fontFamily: "Cinzel, serif" }} className="text-2xl font-bold text-navy mb-6 uppercase tracking-wide">Cost & Registration</h2>
+        <section className="rounded-[2rem] p-5 sm:p-8 md:p-10 border" style={{ background: "rgba(201,168,76,0.08)", borderColor: "rgba(201,168,76,0.2)", boxShadow: "var(--shadow-xs)" }}>
+          <h2 style={{ fontFamily: "Cinzel, serif" }} className="text-xl sm:text-2xl font-bold text-navy mb-6 uppercase tracking-wide">Cost & Registration</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div className="rounded-2xl p-6" style={{ background: "rgba(26,47,78,0.05)", border: "1px solid rgba(26,47,78,0.15)" }}>
               <p className="font-body font-semibold text-navy text-sm mb-2 uppercase tracking-wider">Conference Fee</p>
@@ -151,8 +185,8 @@ He has sent me to bind up the brokenhearted, to proclaim freedom for the captive
         </section>
 
         {/* Delegate Categories */}
-        <section className="rounded-[2rem] p-8 md:p-10 bg-white" style={{ border: "1px solid rgba(232,224,208,0.8)", boxShadow: "var(--shadow-card)" }}>
-          <h2 style={{ fontFamily: "Cinzel, serif" }} className="text-2xl font-bold text-navy mb-6 uppercase tracking-wide">Delegate Categories</h2>
+        <section className="rounded-[2rem] p-5 sm:p-8 md:p-10 bg-white" style={{ border: "1px solid rgba(232,224,208,0.8)", boxShadow: "var(--shadow-card)" }}>
+          <h2 style={{ fontFamily: "Cinzel, serif" }} className="text-xl sm:text-2xl font-bold text-navy mb-6 uppercase tracking-wide">Delegate Categories</h2>
           <p className="font-body text-gray-600 mb-6">Conference attendees are divided into three categories:</p>
           <div className="space-y-4">
             {[
@@ -179,8 +213,8 @@ He has sent me to bind up the brokenhearted, to proclaim freedom for the captive
         </section>
 
         {/* What to Expect */}
-        <section className="rounded-[2rem] p-8 md:p-10 border" style={{ background: "rgba(26,47,78,0.04)", borderColor: "rgba(26,47,78,0.12)", boxShadow: "var(--shadow-xs)" }}>
-          <h2 style={{ fontFamily: "Cinzel, serif" }} className="text-2xl font-bold text-navy mb-6 uppercase tracking-wide">What to Expect</h2>
+        <section className="rounded-[2rem] p-5 sm:p-8 md:p-10 border" style={{ background: "rgba(26,47,78,0.04)", borderColor: "rgba(26,47,78,0.12)", boxShadow: "var(--shadow-xs)" }}>
+          <h2 style={{ fontFamily: "Cinzel, serif" }} className="text-xl sm:text-2xl font-bold text-navy mb-6 uppercase tracking-wide">What to Expect</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {EXPECT_ITEMS.map(({ Icon, title, desc }) => (
               <div key={title} className="flex gap-4 p-5 rounded-2xl bg-white hover:shadow-md transition-all duration-200 group"
@@ -199,8 +233,8 @@ He has sent me to bind up the brokenhearted, to proclaim freedom for the captive
         </section>
 
         {/* Dress Codes */}
-        <section className="rounded-[2rem] p-8 md:p-10 border" style={{ background: "rgba(124,58,237,0.05)", borderColor: "rgba(124,58,237,0.15)", boxShadow: "var(--shadow-xs)" }}>
-          <h2 style={{ fontFamily: "Cinzel, serif" }} className="text-2xl font-bold text-navy mb-6 uppercase tracking-wide">Special Events & Dress Themes</h2>
+        <section className="rounded-[2rem] p-5 sm:p-8 md:p-10 border" style={{ background: "rgba(124,58,237,0.05)", borderColor: "rgba(124,58,237,0.15)", boxShadow: "var(--shadow-xs)" }}>
+          <h2 style={{ fontFamily: "Cinzel, serif" }} className="text-xl sm:text-2xl font-bold text-navy mb-6 uppercase tracking-wide">Special Events & Dress Themes</h2>
           <div className="space-y-3">
             {DRESS_ITEMS.map(({ Icon, color, bg, border, day, dress }) => (
               <div key={day} className={`flex gap-4 p-5 rounded-2xl ${bg} border ${border}`}>
@@ -217,22 +251,22 @@ He has sent me to bind up the brokenhearted, to proclaim freedom for the captive
         </section>
 
         {/* Partners */}
-        <section className="rounded-[2rem] p-8 md:p-10 border overflow-hidden" style={{ background: "linear-gradient(135deg, rgba(255,250,240,1) 0%, rgba(240,232,208,0.75) 100%)", borderColor: "rgba(201,168,76,0.22)", boxShadow: "var(--shadow-card)" }}>
+        <section className="rounded-[2rem] p-5 sm:p-8 md:p-10 border overflow-hidden" style={{ background: "linear-gradient(135deg, rgba(255,250,240,1) 0%, rgba(240,232,208,0.75) 100%)", borderColor: "rgba(201,168,76,0.22)", boxShadow: "var(--shadow-card)" }}>
           <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-6">
             <div>
               <p className="section-label text-left">Conference Partners</p>
-              <h2 style={{ fontFamily: "Cinzel, serif" }} className="text-2xl font-bold text-navy uppercase tracking-wide">Trusted partners for a memorable gathering</h2>
+              <h2 style={{ fontFamily: "Cinzel, serif" }} className="text-xl sm:text-2xl font-bold text-navy uppercase tracking-wide">Trusted partners for a memorable gathering</h2>
             </div>
-            <p className="font-body text-sm text-gray-600 max-w-xl">These are placeholder partner cards for now and can be replaced with actual sponsors, hosts and service providers once confirmed.</p>
+            <p className="font-body text-sm text-gray-600 max-w-xl">The 3rd General Conference is hosted by the Methodist Church in Zimbabwe, in partnership with churches and organisations from across the world Methodist family.</p>
           </div>
           <div className="relative overflow-hidden rounded-2xl border border-white/70 bg-white/70 py-3">
-            <div className="marquee-track flex w-max items-stretch gap-4" style={{ animation: "marquee 20s linear infinite" }}>
+            <div className="marquee-track flex w-max items-stretch gap-4" style={{ animation: "marquee 32s linear infinite" }}>
               {[...PARTNERS, ...PARTNERS].map((partner, index) => (
-                <div key={`${partner.name}-${index}`} className="min-w-[220px] rounded-2xl border bg-white p-4 shadow-sm">
+                <div key={`${partner.name}-${index}`} className="w-[260px] flex-shrink-0 rounded-2xl border bg-white p-4 shadow-sm">
                   <div className="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold text-white mb-3" style={{ background: partner.accent }}>
-                    {partner.name.split(" ").map((word) => word[0]).join("").slice(0, 2)}
+                    {partner.initials}
                   </div>
-                  <p className="font-body font-semibold text-sm text-navy mb-1">{partner.name}</p>
+                  <p className="font-body font-semibold text-sm text-navy mb-1 leading-snug">{partner.name}</p>
                   <p className="font-body text-[11px] uppercase tracking-[0.2em] mb-2" style={{ color: partner.accent }}>{partner.type}</p>
                   <p className="font-body text-xs text-gray-600 leading-relaxed">{partner.description}</p>
                 </div>
@@ -242,8 +276,8 @@ He has sent me to bind up the brokenhearted, to proclaim freedom for the captive
         </section>
 
         {/* Programme Schedule */}
-        <section className="rounded-[2rem] p-8 md:p-10 text-white relative overflow-hidden" style={{ background: "linear-gradient(135deg, rgba(26,47,78,0.95) 0%, rgba(13,28,47,1) 100%)", boxShadow: "var(--shadow-card)" }}>
-          <h2 style={{ fontFamily: "Cinzel, serif" }} className="text-2xl font-bold mb-4 uppercase tracking-wide">Programme Schedule</h2>
+        <section className="rounded-[2rem] p-5 sm:p-8 md:p-10 text-white relative overflow-hidden" style={{ background: "linear-gradient(135deg, rgba(26,47,78,0.95) 0%, rgba(13,28,47,1) 100%)", boxShadow: "var(--shadow-card)" }}>
+          <h2 style={{ fontFamily: "Cinzel, serif" }} className="text-xl sm:text-2xl font-bold mb-4 uppercase tracking-wide">Programme Schedule</h2>
           <p className="font-body text-white/90 mb-6 leading-relaxed">
             The official programme starts at <strong className="text-gold">08:30 hrs on Wednesday, March 10, 2027</strong>. The conference will feature both plenary sessions and separate sessions including business meetings and presentations.
           </p>

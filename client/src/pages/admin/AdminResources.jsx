@@ -4,12 +4,16 @@
  * other documents shared by guest speakers.
  */
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Upload, Trash2, Link as LinkIcon, FileText } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import api, { assetUrl } from '../../lib/api';
+import FilterBar from '../../components/admin/FilterBar';
+import { inDateRange } from '../../lib/utils';
 
 const CATEGORIES = ['Presentation', 'Keynote Material', 'Document', 'Report', 'Other'];
+
+const BLANK_FILTERS = { search: '', category: '', published: '', source: '', from: '', to: '' };
 
 const EMPTY = {
   title: '', description: '', category: 'Document', speaker_name: '',
@@ -30,6 +34,7 @@ function formatSize(bytes) {
 export default function AdminResources() {
   const { token } = useAuth();
   const [resources, setResources] = useState([]);
+  const [filters, setFilters] = useState(BLANK_FILTERS);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(null); // null | 'add' | 'edit'
   const [form, setForm] = useState(EMPTY);
@@ -52,6 +57,25 @@ export default function AdminResources() {
   };
 
   useEffect(() => { load(); }, []);
+
+  const setFilter = (key, value) => setFilters((f) => ({ ...f, [key]: value }));
+  const filtersActive = Object.values(filters).some(Boolean);
+
+  const visible = useMemo(() => {
+    const term = filters.search.trim().toLowerCase();
+
+    return resources.filter((r) => {
+      if (term && ![r.title, r.description, r.speaker_name]
+        .some((f) => (f || '').toLowerCase().includes(term))) return false;
+      if (filters.category && r.category !== filters.category) return false;
+      if (filters.published === 'live' && !r.published) return false;
+      if (filters.published === 'draft' && r.published) return false;
+      if (filters.source === 'file' && !r.file_url) return false;
+      if (filters.source === 'link' && !(!r.file_url && r.external_url)) return false;
+      if (!inDateRange(r.created_at, filters.from, filters.to)) return false;
+      return true;
+    });
+  }, [resources, filters]);
 
   const openAdd = () => { setForm(EMPTY); setError(''); setShowUrlField(false); setModal('add'); };
   const openEdit = (r) => {
@@ -124,16 +148,63 @@ export default function AdminResources() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <h2 style={{ fontFamily: 'Cinzel, serif', color: 'var(--color-navy)' }} className="text-xl font-bold uppercase tracking-wide">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+        <h2 style={{ fontFamily: 'Cinzel, serif', color: 'var(--color-navy)' }} className="text-lg sm:text-xl font-bold uppercase tracking-wide">
           Resources
         </h2>
         <button className="btn-gold text-sm px-5 py-2" onClick={openAdd}>+ Add Resource</button>
       </div>
 
-      <p className="font-body text-sm text-gray-500 mb-5">
+      <p className="font-body text-sm text-gray-500 mb-4">
         Conference resources, presentations, keynote materials and other documents shared by guest speakers.
       </p>
+
+      <FilterBar
+        search={filters.search}
+        onSearchChange={(v) => setFilter('search', v)}
+        searchPlaceholder="Search title, description or contributor…"
+        selects={[
+          {
+            label: 'Category',
+            value: filters.category,
+            onChange: (v) => setFilter('category', v),
+            options: [
+              { value: '', label: 'All categories' },
+              ...CATEGORIES.map((c) => ({ value: c, label: c })),
+            ],
+          },
+          {
+            label: 'Visibility',
+            value: filters.published,
+            onChange: (v) => setFilter('published', v),
+            options: [
+              { value: '', label: 'All visibility' },
+              { value: 'live', label: 'Live on site' },
+              { value: 'draft', label: 'Hidden' },
+            ],
+          },
+          {
+            label: 'Type',
+            value: filters.source,
+            onChange: (v) => setFilter('source', v),
+            options: [
+              { value: '', label: 'File or link' },
+              { value: 'file', label: 'Uploaded file' },
+              { value: 'link', label: 'External link' },
+            ],
+          },
+        ]}
+        dateRange={{
+          label: 'Added',
+          from: filters.from,
+          to: filters.to,
+          onFromChange: (v) => setFilter('from', v),
+          onToChange: (v) => setFilter('to', v),
+        }}
+        active={filtersActive}
+        onReset={() => setFilters(BLANK_FILTERS)}
+        summary={filtersActive ? `Showing ${visible.length} of ${resources.length} resources` : `${resources.length} resources`}
+      />
 
       {loadError && (
         <div className="rounded-xl border border-red-200 bg-red-50 p-4 mb-4 text-sm text-red-700">{loadError}</div>
@@ -142,8 +213,8 @@ export default function AdminResources() {
       {loading ? (
         <div className="flex justify-center py-20"><div className="w-6 h-6 rounded-full border-2 border-gold border-t-transparent animate-spin" /></div>
       ) : (
-        <div className="bg-white rounded-xl border border-[#e8e0d0] overflow-hidden">
-          <table className="w-full text-sm font-body">
+        <div className="bg-white rounded-xl border border-[#e8e0d0] overflow-x-auto">
+          <table className="w-full text-sm font-body min-w-[32rem]">
             <thead>
               <tr style={{ background: 'var(--color-cream-dark)' }}>
                 <th className="text-left px-4 py-3 font-semibold" style={{ color: 'var(--color-navy)' }}>Title</th>
@@ -154,7 +225,7 @@ export default function AdminResources() {
               </tr>
             </thead>
             <tbody>
-              {resources.map((r, i) => (
+              {visible.map((r, i) => (
                 <tr key={r.id} className={i % 2 === 0 ? '' : 'bg-gray-50'}>
                   <td className="px-4 py-3 font-medium" style={{ color: 'var(--color-charcoal)' }}>
                     <span className="flex items-center gap-2">
@@ -173,8 +244,12 @@ export default function AdminResources() {
                   </td>
                 </tr>
               ))}
-              {!resources.length && (
-                <tr><td colSpan={5} className="px-4 py-10 text-center text-gray-400 font-body">No resources yet. Add one above.</td></tr>
+              {!visible.length && (
+                <tr>
+                  <td colSpan={5} className="px-4 py-10 text-center text-gray-400 font-body">
+                    {resources.length ? 'No resources match these filters.' : 'No resources yet. Add one above.'}
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>
@@ -198,7 +273,7 @@ export default function AdminResources() {
                 <input className="form-input" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} required />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="form-label">Category</label>
                   <select className="form-input" value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}>
@@ -280,7 +355,7 @@ export default function AdminResources() {
                 )}
               </div>
 
-              <div className="grid grid-cols-2 gap-4 items-end">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
                 <div>
                   <label className="form-label">Display order</label>
                   <input

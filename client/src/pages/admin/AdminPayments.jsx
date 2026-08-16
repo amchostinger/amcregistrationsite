@@ -30,8 +30,8 @@ export default function AdminPayments() {
 
   return (
     <div>
-      <div className="mb-6">
-        <h2 className="font-heading text-2xl font-bold text-navy">Payments</h2>
+      <div className="mb-5">
+        <h2 className="font-heading text-xl sm:text-2xl font-bold text-navy">Payments</h2>
         <p className="text-gray-500 text-sm">{total} payment records</p>
       </div>
 

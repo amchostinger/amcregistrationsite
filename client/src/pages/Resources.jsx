@@ -117,7 +117,7 @@ export default function Resources() {
         <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, rgba(15,30,51,0.6), rgba(15,30,51,0.9))" }} />
         <div className="section-container text-center relative z-10 pt-6">
           <span className="section-label">AMC 2027</span>
-          <h1 style={{ fontFamily: "Cinzel, serif" }} className="text-4xl lg:text-5xl font-bold text-white uppercase tracking-widest mb-3">Resources</h1>
+          <h1 style={{ fontFamily: "Cinzel, serif" }} className="page-title text-white mb-3">Resources</h1>
           <div style={{ height: "3px", width: "48px", background: "var(--gold-gradient)", margin: "0 auto" }} className="rounded-full" />
           <p className="font-body text-white/60 text-sm mt-3">Presentations, Keynote Materials & Documents</p>
         </div>

@@ -92,24 +92,24 @@ export default function AttendeeModal({ registrantId, onClose, onStatusUpdate })
       : [];
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-3 sm:p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[92vh] overflow-y-auto scrollbar-thin">
         {/* Header */}
-        <div className="sticky top-0 bg-navy text-white px-6 py-4 flex items-center justify-between rounded-t-2xl">
-          <div>
+        <div className="sticky top-0 z-10 bg-navy text-white px-4 sm:px-6 py-4 flex items-start justify-between gap-3 rounded-t-2xl">
+          <div className="min-w-0">
             <p className="text-gold text-xs font-semibold uppercase tracking-wide">{registrant.registration_ref}</p>
-            <h3 className="font-heading font-semibold text-lg">
+            <h3 className="font-heading font-semibold text-base sm:text-lg break-words">
               {registrant.designation} {registrant.first_name} {registrant.last_name}
             </h3>
           </div>
-          <button onClick={onClose} className="text-white/70 hover:text-white text-2xl leading-none">×</button>
+          <button onClick={onClose} className="text-white/70 hover:text-white text-2xl leading-none flex-shrink-0">×</button>
         </div>
 
-        <div className="p-6 space-y-6">
+        <div className="p-4 sm:p-6 space-y-6">
           {/* Details */}
           <div>
             <h4 className="font-heading font-semibold text-navy mb-3">Registrant Details</h4>
-            <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
+            <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
               {[
                 ['Email', registrant.email],
                 ['Phone', registrant.phone],
@@ -128,7 +128,7 @@ export default function AttendeeModal({ registrantId, onClose, onStatusUpdate })
               ].map(([label, value]) => value ? (
                 <div key={label} className="contents">
                   <dt className="text-gray-500 font-medium">{label}</dt>
-                  <dd className="text-gray-800">{value}</dd>
+                  <dd className="text-gray-800 break-words">{value}</dd>
                 </div>
               ) : null)}
             </dl>
@@ -141,7 +141,7 @@ export default function AttendeeModal({ registrantId, onClose, onStatusUpdate })
                 {delegateDetails.map((delegate, index) => (
                   <div key={index} className="rounded-xl border border-gray-200 bg-slate-50 p-4">
                     <p className="font-semibold text-sm text-navy mb-2">Delegate {index + 2}</p>
-                    <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
+                    <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
                       {[
                         ['Designation', delegate.designation],
                         ['Category', delegate.category],
@@ -154,7 +154,7 @@ export default function AttendeeModal({ registrantId, onClose, onStatusUpdate })
                       ].map(([label, value]) => value ? (
                         <div key={label} className="contents">
                           <dt className="text-gray-500 font-medium">{label}</dt>
-                          <dd className="text-gray-800">{value}</dd>
+                          <dd className="text-gray-800 break-words">{value}</dd>
                         </div>
                       ) : null)}
                     </dl>
@@ -166,7 +166,7 @@ export default function AttendeeModal({ registrantId, onClose, onStatusUpdate })
 
           <div className="rounded-xl border border-[#e5e7eb] bg-slate-50 p-4">
             <h4 className="font-heading font-semibold text-navy mb-3">Financial Summary</h4>
-            <div className="grid grid-cols-2 gap-3 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
               {[
                 ['Conference total', formatCurrency(registrant.conference_total || 0)],
                 ['Hotel total', formatCurrency(registrant.hotel_total || 0)],
@@ -207,7 +207,7 @@ export default function AttendeeModal({ registrantId, onClose, onStatusUpdate })
           {/* Status Update */}
           <div>
             <h4 className="font-heading font-semibold text-navy mb-3">Update Registration Status</h4>
-            <div className="flex gap-3">
+            <div className="flex flex-col sm:flex-row gap-3">
               <select
                 className="form-input flex-1"
                 value={newStatus}
@@ -230,7 +230,7 @@ export default function AttendeeModal({ registrantId, onClose, onStatusUpdate })
           {/* Email Actions */}
           <div>
             <h4 className="font-heading font-semibold text-navy mb-3">Email Actions</h4>
-            <div className="flex gap-3">
+            <div className="flex flex-col sm:flex-row gap-3">
               <button onClick={handleResendConfirmation} className="btn-outline py-2 px-4 text-sm flex-1">
                 Resend Registration Email
               </button>

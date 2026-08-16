@@ -63,7 +63,9 @@ export const adminApi = {
   getRegistration: (id) => api.get(`/admin/registrations/${id}`),
   updateStatus: (id, status) => api.patch(`/admin/registrations/${id}/status`, { registration_status: status }),
   getPayments: (params) => api.get('/admin/payments', { params }),
-  exportCsv: () => api.get('/admin/export/csv', { responseType: 'blob' }),
+  // Accepts the same filter params as getRegistrations, so an export mirrors
+  // whatever the admin has filtered down to on screen.
+  exportCsv: (params) => api.get('/admin/export/csv', { params, responseType: 'blob' }),
   getSettings: () => api.get('/admin/settings'),
   updateSettings: (settings) => api.patch('/admin/settings', settings),
   resendConfirmation: (id) => api.post(`/email/resend-confirmation/${id}`),

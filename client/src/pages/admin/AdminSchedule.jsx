@@ -108,8 +108,8 @@ export default function AdminSchedule() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <h2 style={{ fontFamily: 'Cinzel, serif', color: 'var(--color-navy)' }} className="text-xl font-bold uppercase tracking-wide">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
+        <h2 style={{ fontFamily: 'Cinzel, serif', color: 'var(--color-navy)' }} className="text-lg sm:text-xl font-bold uppercase tracking-wide">
           Schedule
         </h2>
         <button className="btn-gold text-sm px-5 py-2" onClick={openAdd}>+ Add Session</button>
@@ -180,7 +180,7 @@ export default function AdminSchedule() {
                 <label className="form-label">Title *</label>
                 <input className="form-input" value={form.title} onChange={e => setForm({...form, title: e.target.value})} required />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="form-label">Date</label>
                   <select className="form-input" value={form.session_date} onChange={e => setForm({...form, session_date: e.target.value})}>
@@ -194,7 +194,7 @@ export default function AdminSchedule() {
                   </select>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="form-label">Start Time</label>
                   <input type="time" className="form-input" value={form.start_time} onChange={e => setForm({...form, start_time: e.target.value})} />

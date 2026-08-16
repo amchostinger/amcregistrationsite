@@ -28,9 +28,9 @@ export default function AdminDashboard() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
         <div>
-          <h2 className="font-heading text-2xl font-bold text-navy">Dashboard</h2>
+          <h2 className="font-heading text-xl sm:text-2xl font-bold text-navy">Dashboard</h2>
           <p className="text-gray-500 text-sm">AMC 2027 Conference Overview</p>
         </div>
         <div className="flex gap-3">

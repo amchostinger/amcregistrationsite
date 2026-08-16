@@ -205,11 +205,11 @@ export default function AdminHotels() {
   const STATUS_COLORS = { confirmed: 'badge-green', reserved: 'badge-yellow', cancelled: 'badge-gray' };
 
   return (
-    <div className="flex gap-6">
+    <div className="flex flex-col xl:flex-row gap-6">
       {/* Main panel */}
-      <div className="flex-1">
-        <div className="flex items-center justify-between mb-6">
-          <h2 style={{ fontFamily: 'Cinzel, serif', color: 'var(--color-navy)' }} className="text-xl font-bold uppercase tracking-wide">
+      <div className="flex-1 min-w-0">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
+          <h2 style={{ fontFamily: 'Cinzel, serif', color: 'var(--color-navy)' }} className="text-lg sm:text-xl font-bold uppercase tracking-wide">
             Hotels
           </h2>
           <button className="btn-gold text-sm px-5 py-2" onClick={openAdd}>+ Add Hotel</button>
@@ -296,7 +296,7 @@ export default function AdminHotels() {
 
       {/* Bookings drawer */}
       {drawerHotel && (
-        <div className="w-80 flex-shrink-0">
+        <div className="w-full xl:w-80 flex-shrink-0">
           <div className="bg-white rounded-xl border border-[#e8e0d0] p-5 sticky top-6">
             <div className="flex items-center justify-between mb-4">
               <h3 style={{ fontFamily: 'Cinzel, serif', color: 'var(--color-navy)' }} className="text-sm font-bold uppercase tracking-wide">
@@ -359,7 +359,7 @@ export default function AdminHotels() {
                 <label className="form-label">Hotel Name *</label>
                 <input className="form-input" value={form.name} onChange={e => setForm({...form, name: e.target.value})} required />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="form-label">Stars</label>
                   <select className="form-input" value={form.stars ?? 4} onChange={e => setForm({...form, stars: parseInt(e.target.value)})}>
@@ -375,7 +375,7 @@ export default function AdminHotels() {
                 <label className="form-label">Address</label>
                 <input className="form-input" value={form.address || ''} onChange={e => setForm({...form, address: e.target.value})} />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="form-label">Distance from Venue (km)</label>
                   <input type="number" className="form-input" value={form.distance_km ?? 0} onChange={e => setForm({...form, distance_km: parseFloat(e.target.value)||0})} step={0.1} min={0} />
@@ -385,7 +385,7 @@ export default function AdminHotels() {
                   <input className="form-input" value={form.room_type || ''} onChange={e => setForm({...form, room_type: e.target.value})} />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="form-label">Total Rooms</label>
                   <input type="number" className="form-input" value={form.total_rooms ?? 0} onChange={e => setForm({...form, total_rooms: parseInt(e.target.value)||0})} min={0} />

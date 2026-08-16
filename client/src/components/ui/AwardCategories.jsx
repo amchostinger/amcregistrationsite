@@ -25,7 +25,7 @@ export default function AwardCategories({ showWhenEmpty = false }) {
 
   return (
     <section
-      className="rounded-[2rem] p-8 md:p-10 border"
+      className="rounded-[2rem] p-5 sm:p-8 md:p-10 border"
       style={{
         background: "rgba(201,168,76,0.08)",
         borderColor: "rgba(201,168,76,0.2)",
@@ -59,7 +59,7 @@ export default function AwardCategories({ showWhenEmpty = false }) {
           {categories.map((c) => (
             <div
               key={c.id}
-              className="rounded-2xl bg-white p-6"
+              className="rounded-2xl bg-white p-5 sm:p-6"
               style={{ border: "1px solid rgba(232,224,208,0.9)", boxShadow: "var(--shadow-card)" }}
             >
               <h3

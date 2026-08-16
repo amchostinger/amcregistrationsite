@@ -11,7 +11,7 @@ export default function ConfirmationStep({ registrationRef, registrant, payment 
           style={{ background: "rgba(5,150,105,0.1)", border: "2px solid rgba(5,150,105,0.3)" }}>
           <CheckCircle size={40} className="text-emerald-600" />
         </div>
-        <h2 style={{ fontFamily: "Cinzel, serif" }} className="text-2xl font-bold text-navy mb-2">Registration Confirmed!</h2>
+        <h2 style={{ fontFamily: "Cinzel, serif" }} className="text-xl sm:text-2xl font-bold text-navy mb-2">Registration Confirmed!</h2>
         <p className="font-body text-gray-500 text-sm">Your payment has been received and your place is secured.</p>
       </div>
 
@@ -19,7 +19,7 @@ export default function ConfirmationStep({ registrationRef, registrant, payment 
       <div className="rounded-2xl p-6 text-center mb-6"
         style={{ background: "rgba(201,168,76,0.1)", border: "1px solid rgba(201,168,76,0.3)" }}>
         <p className="font-body text-navy text-xs font-bold uppercase tracking-widest mb-2">Booking Reference</p>
-        <p style={{ fontFamily: "Cinzel, serif" }} className="text-3xl font-bold text-navy">{registrationRef}</p>
+        <p style={{ fontFamily: "Cinzel, serif" }} className="text-2xl sm:text-3xl font-bold text-navy break-all">{registrationRef}</p>
         <p className="font-body text-gray-500 text-xs mt-2">Keep this reference for check-in at the conference</p>
       </div>
 
@@ -27,7 +27,7 @@ export default function ConfirmationStep({ registrationRef, registrant, payment 
       {registrant && (
         <div className="rounded-2xl p-5 mb-6 bg-white" style={{ border: "1px solid rgba(232,224,208,0.8)" }}>
           <h4 className="font-heading font-bold text-navy text-sm uppercase tracking-wider mb-4">Registrant Details</h4>
-          <dl className="grid grid-cols-2 gap-x-4 gap-y-2 font-body text-sm">
+          <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 font-body text-sm">
             <dt className="text-gray-500">Name</dt>
             <dd className="font-semibold text-navy">{registrant.designation} {registrant.first_name} {registrant.last_name}</dd>
             <dt className="text-gray-500">Category</dt>
