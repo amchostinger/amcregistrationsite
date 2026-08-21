@@ -6,12 +6,13 @@ import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { useAdminRegistrations } from '../../hooks/useAdmin';
 import { adminApi } from '../../lib/api';
-import { downloadBlob } from '../../lib/utils';
+import { downloadBlob, downloadErrorMessage } from '../../lib/utils';
 import RegistrationsTable from '../../components/admin/RegistrationsTable';
 
 export default function AdminRegistrations() {
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState({});
+  const [exporting, setExporting] = useState(null);
 
   const { registrations, total, totalPages, loading, error, load } = useAdminRegistrations();
 
@@ -40,15 +41,40 @@ export default function AdminRegistrations() {
     }
   };
 
+  // Every export covers exactly what the current filters select, not the whole
+  // table — the page number is dropped so it spans all matching pages.
+  const exportFilters = () => {
+    const { page: _page, ...rest } = filters;
+    return rest;
+  };
+
   const handleExportCsv = async () => {
+    setExporting('csv');
     try {
-      // Export exactly what the current filters select, not the whole table.
-      const { page: _page, ...exportFilters } = filters;
-      const { data } = await adminApi.exportCsv(exportFilters);
+      const { data } = await adminApi.exportCsv(exportFilters());
       downloadBlob(data, `amc2027-registrations-${Date.now()}.csv`);
       toast.success('CSV exported.');
-    } catch {
-      toast.error('Export failed.');
+    } catch (err) {
+      toast.error(await downloadErrorMessage(err, 'Export failed.'));
+    } finally {
+      setExporting(null);
+    }
+  };
+
+  /**
+   * @param {boolean} detailed — append a full record page per registrant after
+   *   the summary listing, rather than the listing alone.
+   */
+  const handleExportPdf = async (detailed) => {
+    setExporting(detailed ? 'pdf-detailed' : 'pdf');
+    try {
+      const { data } = await adminApi.registrationsPdf({ ...exportFilters(), detailed });
+      downloadBlob(data, `amc2027-registrations-${detailed ? 'detailed-' : ''}${Date.now()}.pdf`);
+      toast.success('PDF exported.');
+    } catch (err) {
+      toast.error(await downloadErrorMessage(err, 'Export failed.'));
+    } finally {
+      setExporting(null);
     }
   };
 
@@ -59,9 +85,30 @@ export default function AdminRegistrations() {
           <h2 className="font-heading text-xl sm:text-2xl font-bold text-navy">Registrations</h2>
           <p className="text-gray-500 text-sm">{total} total registrations</p>
         </div>
-        <button onClick={handleExportCsv} className="btn-primary py-2 px-4 text-sm">
-          Export CSV
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={handleExportCsv}
+            disabled={!!exporting}
+            className="btn-outline py-2 px-4 text-sm disabled:opacity-50"
+          >
+            {exporting === 'csv' ? 'Exporting…' : 'Export CSV'}
+          </button>
+          <button
+            onClick={() => handleExportPdf(false)}
+            disabled={!!exporting}
+            className="btn-primary py-2 px-4 text-sm disabled:opacity-50"
+          >
+            {exporting === 'pdf' ? 'Building…' : 'Export PDF'}
+          </button>
+          <button
+            onClick={() => handleExportPdf(true)}
+            disabled={!!exporting}
+            title="Summary listing plus a full record page for every registrant"
+            className="btn-outline py-2 px-4 text-sm disabled:opacity-50"
+          >
+            {exporting === 'pdf-detailed' ? 'Building…' : 'Full PDF Pack'}
+          </button>
+        </div>
       </div>
 
       <RegistrationsTable

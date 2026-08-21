@@ -68,8 +68,20 @@ export const adminApi = {
   exportCsv: (params) => api.get('/admin/export/csv', { params, responseType: 'blob' }),
   getSettings: () => api.get('/admin/settings'),
   updateSettings: (settings) => api.patch('/admin/settings', settings),
+
+  // ── PDF documents ──
+  // Single records; the bulk reports take the same filter params as their list.
+  registrationPdf: (id) => api.get(`/admin/registrations/${id}/pdf`, { responseType: 'blob' }),
+  paymentPdf: (id) => api.get(`/admin/payments/${id}/pdf`, { responseType: 'blob' }),
+  // `detailed: true` appends a full page per registrant after the listing.
+  registrationsPdf: (params) => api.get('/admin/export/registrations/pdf', { params, responseType: 'blob' }),
+  paymentsPdf: (params) => api.get('/admin/export/payments/pdf', { params, responseType: 'blob' }),
+
+  // ── Email actions ──
+  emailStatus: () => api.get('/email/status'),
   resendConfirmation: (id) => api.post(`/email/resend-confirmation/${id}`),
   resendPayment: (id) => api.post(`/email/resend-payment/${id}`),
+  sendPaymentReminder: (id) => api.post(`/email/payment-reminder/${id}`),
 };
 
 export default api;

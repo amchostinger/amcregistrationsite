@@ -9,18 +9,29 @@ const { Parser } = require('json2csv');
 
 const { query, pool } = require('../config/db');
 const clerkAuth = require('../middleware/clerkAuth');
+const pdfService = require('../services/pdfService');
 
 const router = express.Router();
 
 // Apply Clerk auth to all admin routes
 router.use(clerkAuth);
 
+/**
+ * Who performed an admin action, for the audit trail.
+ *
+ * The JWT issued by POST /api/auth/login carries { id, email, name } — there is
+ * no `userId` claim, so every call site reading `req.auth.userId` was passing
+ * undefined, which mysql2 rejects. Because auditLog swallows its own errors,
+ * that failed silently and the audit trail stayed empty.
+ */
+const adminRef = (req) => req.auth?.email || (req.auth?.id != null ? String(req.auth.id) : null);
+
 // Helper: log admin action to audit trail
 async function auditLog(adminClerkId, action, targetTable, targetId, notes) {
   await query(
     `INSERT INTO admin_audit_log (admin_clerk_id, action, target_table, target_id, notes)
      VALUES (?, ?, ?, ?, ?)`,
-    [adminClerkId, action, targetTable || null, targetId || null, notes || null]
+    [adminClerkId || null, action, targetTable || null, targetId || null, notes || null]
   ).catch((err) => console.error('[Audit Log Error]', err.message));
 }
 
@@ -208,7 +219,7 @@ router.patch('/registrations/:id/status', async (req, res, next) => {
     );
 
     await auditLog(
-      req.auth.userId,
+      adminRef(req),
       'UPDATE_STATUS',
       'registrants',
       req.params.id,
@@ -223,6 +234,85 @@ router.patch('/registrations/:id/status', async (req, res, next) => {
 
 // ─── GET /api/admin/payments ──────────────────────────────────────────────────
 
+/**
+ * The payments view is driven by *registrations*, not by rows in the payments
+ * table, so its total always reconciles with the registrations page.
+ *
+ * Counting payment rows meant a registrant who never started a payment appeared
+ * nowhere here — 18 registrations against 9 payment rows — and the nine people
+ * who owed the most were precisely the ones missing. Each registration now
+ * contributes exactly one row: its settled payment if there is one, otherwise
+ * its most recent attempt, otherwise a synthetic 'unpaid' row.
+ */
+const PAYMENT_JOIN = `
+  FROM registrants r
+  LEFT JOIN payments p ON p.id = (
+    SELECT p2.id FROM payments p2
+    WHERE p2.registrant_id = r.id
+    ORDER BY (p2.status = 'paid') DESC, p2.paid_at DESC, p2.created_at DESC
+    LIMIT 1
+  )`;
+
+/** Status shown for a registration with no payment row at all. */
+const DERIVED_STATUS = `COALESCE(p.status, 'unpaid')`;
+/** Date a row is filtered and sorted on: when it was paid, attempted, or registered. */
+const DERIVED_DATE = `COALESCE(p.paid_at, p.created_at, r.created_at)`;
+
+/**
+ * Search + filter clause shared by the payments list and the payments PDF
+ * export, so a report always contains exactly the rows the admin is looking at.
+ */
+function paymentFilters(q) {
+  const conditions = ['1=1'];
+  const params = [];
+
+  if (q.search) {
+    conditions.push(`(r.registration_ref LIKE ? OR r.first_name LIKE ? OR r.last_name LIKE ?
+                      OR r.email LIKE ? OR p.paynow_reference LIKE ?)`);
+    const s = `%${q.search}%`;
+    params.push(s, s, s, s, s);
+  }
+  if (q.status) {
+    // Matches 'unpaid' too, which no payments row can carry.
+    conditions.push(`${DERIVED_STATUS} = ?`);
+    params.push(q.status);
+  }
+  if (q.method) {
+    conditions.push('p.payment_method = ?');
+    params.push(q.method);
+  }
+  if (q.currency) {
+    conditions.push('p.currency = ?');
+    params.push(q.currency);
+  }
+  if (q.category) {
+    conditions.push('r.category = ?');
+    params.push(q.category);
+  }
+
+  const from = dateBound(q.date_from, false);
+  const to = dateBound(q.date_to, true);
+  if (from) { conditions.push(`${DERIVED_DATE} >= ?`); params.push(from); }
+  if (to) { conditions.push(`${DERIVED_DATE} <= ?`); params.push(to); }
+
+  return { where: conditions.join(' AND '), params };
+}
+
+/**
+ * Columns for a payments row. `payment_attempts` keeps the earlier attempts
+ * visible even though only one row per registration is listed, so collapsing
+ * them never hides a retry from the admin.
+ */
+const PAYMENT_COLUMNS = `
+  p.id, p.registrant_id, p.paynow_reference, p.paynow_poll_url, p.paynow_status_raw,
+  p.amount, p.currency, p.payment_method, p.paid_at, p.created_at,
+  ${DERIVED_STATUS} AS status,
+  ${DERIVED_DATE} AS activity_at,
+  (SELECT COUNT(*) FROM payments p3 WHERE p3.registrant_id = r.id) AS payment_attempts,
+  r.id AS registrant_row_id, r.registration_ref, r.designation, r.first_name, r.last_name,
+  r.email, r.category, r.country, r.grand_total, r.amount_paid, r.balance_due,
+  r.payment_status, r.registration_status`;
+
 router.get('/payments', async (req, res, next) => {
   try {
     const pageValue = parseInt(req.query.page || '1', 10);
@@ -230,56 +320,19 @@ router.get('/payments', async (req, res, next) => {
     const page = Number.isInteger(pageValue) && pageValue > 0 ? pageValue : 1;
     const limit = Number.isInteger(limitValue) && limitValue > 0 ? Math.min(100, limitValue) : 20;
     const offset = (page - 1) * limit;
-    const { search, status, method, currency, category, date_from, date_to } = req.query;
 
-    const conditions = ['1=1'];
-    const params = [];
-
-    if (search) {
-      conditions.push(`(r.registration_ref LIKE ? OR r.first_name LIKE ? OR r.last_name LIKE ?
-                        OR r.email LIKE ? OR p.paynow_reference LIKE ?)`);
-      const s = `%${search}%`;
-      params.push(s, s, s, s, s);
-    }
-    if (status) {
-      conditions.push('p.status = ?');
-      params.push(status);
-    }
-    if (method) {
-      conditions.push('p.payment_method = ?');
-      params.push(method);
-    }
-    if (currency) {
-      conditions.push('p.currency = ?');
-      params.push(currency);
-    }
-    if (category) {
-      conditions.push('r.category = ?');
-      params.push(category);
-    }
-
-    const from = dateBound(date_from, false);
-    const to = dateBound(date_to, true);
-    if (from) { conditions.push('p.created_at >= ?'); params.push(from); }
-    if (to) { conditions.push('p.created_at <= ?'); params.push(to); }
-
-    const where = conditions.join(' AND ');
+    const { where, params } = paymentFilters(req.query);
 
     const [countRows] = await query(
-      `SELECT COUNT(*) AS total
-       FROM payments p
-       JOIN registrants r ON r.id = p.registrant_id
-       WHERE ${where}`,
+      `SELECT COUNT(*) AS total ${PAYMENT_JOIN} WHERE ${where}`,
       params
     );
 
     const [rows] = await query(
-      `SELECT p.*, r.registration_ref, r.designation, r.first_name, r.last_name,
-              r.email, r.category, r.country, r.grand_total, r.amount_paid, r.balance_due
-       FROM payments p
-       JOIN registrants r ON r.id = p.registrant_id
+      `SELECT ${PAYMENT_COLUMNS}
+       ${PAYMENT_JOIN}
        WHERE ${where}
-       ORDER BY p.created_at DESC
+       ORDER BY ${DERIVED_DATE} DESC
        LIMIT ${limit} OFFSET ${offset}`,
       params
     );
@@ -330,11 +383,163 @@ router.get('/export/csv', async (req, res, next) => {
     const parser = new Parser({ fields });
     const csv = parser.parse(rows);
 
-    await auditLog(req.auth.userId, 'EXPORT_CSV', 'registrants', null, `Exported ${rows.length} records`);
+    await auditLog(adminRef(req), 'EXPORT_CSV', 'registrants', null, `Exported ${rows.length} records`);
 
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', `attachment; filename="amc2027-registrations-${Date.now()}.csv"`);
     return res.send(csv);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ─── PDF Documents ────────────────────────────────────────────────────────────
+
+/** Columns the registration PDFs read. Kept in one place so the single-record
+ *  document and the bulk report never drift apart. */
+const REGISTRATION_PDF_COLUMNS = `
+  r.id, r.registration_ref, r.designation, r.first_name, r.last_name,
+  r.email, r.phone, r.office, r.category, r.church, r.country,
+  r.accommodation, r.accommodation_nights, r.num_people, r.delegate_details,
+  r.hotel_name, r.hotel_room_type, r.hotel_price_usd, r.hotel_rooms,
+  r.conference_total, r.hotel_total, r.grand_total, r.amount_paid, r.balance_due,
+  r.payment_status, r.registration_status,
+  r.dietary_requirements, r.special_requests, r.created_at`;
+
+/** Human-readable description of the active filters, printed on the report. */
+function describeFilters(q) {
+  const parts = [];
+  if (q.search) parts.push(`search "${q.search}"`);
+  if (q.status) parts.push(`status ${q.status}`);
+  if (q.payment_status) parts.push(`payment ${q.payment_status}`);
+  if (q.category) parts.push(`category ${q.category}`);
+  if (q.country) parts.push(`country ${q.country}`);
+  if (q.method) parts.push(`method ${q.method}`);
+  if (q.currency) parts.push(`currency ${q.currency}`);
+  if (q.date_from) parts.push(`from ${q.date_from}`);
+  if (q.date_to) parts.push(`to ${q.date_to}`);
+  return parts.length ? parts.join(' · ') : null;
+}
+
+function sendPdf(res, buffer, filename) {
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Length', buffer.length);
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  return res.end(buffer);
+}
+
+// ─── GET /api/admin/registrations/:id/pdf ─────────────────────────────────────
+
+router.get('/registrations/:id/pdf', async (req, res, next) => {
+  try {
+    const [rows] = await query('SELECT * FROM registrants WHERE id = ?', [req.params.id]);
+    if (!rows.length) return res.status(404).json({ error: 'Registrant not found.' });
+
+    const [payments] = await query(
+      'SELECT * FROM payments WHERE registrant_id = ? ORDER BY created_at DESC',
+      [req.params.id]
+    );
+
+    const buffer = await pdfService.buildRegistrationPdf(rows[0], payments);
+    await auditLog(adminRef(req), 'EXPORT_PDF', 'registrants', req.params.id, 'Registration record PDF');
+
+    return sendPdf(res, buffer, `AMC2027-registration-${rows[0].registration_ref}.pdf`);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ─── GET /api/admin/payments/:id/pdf ──────────────────────────────────────────
+
+router.get('/payments/:id/pdf', async (req, res, next) => {
+  try {
+    const [payRows] = await query('SELECT * FROM payments WHERE id = ?', [req.params.id]);
+    if (!payRows.length) return res.status(404).json({ error: 'Payment not found.' });
+
+    const [regRows] = await query('SELECT * FROM registrants WHERE id = ?', [payRows[0].registrant_id]);
+    if (!regRows.length) return res.status(404).json({ error: 'Registrant for this payment not found.' });
+
+    const buffer = await pdfService.buildPaymentPdf(payRows[0], regRows[0]);
+    await auditLog(adminRef(req), 'EXPORT_PDF', 'payments', req.params.id, 'Payment receipt PDF');
+
+    return sendPdf(res, buffer, `AMC2027-receipt-${regRows[0].registration_ref}-${payRows[0].id}.pdf`);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ─── GET /api/admin/export/registrations/pdf ──────────────────────────────────
+
+/**
+ * Bulk registrations report. Honours the same filters as the list, so it
+ * exports what is on screen. `?detailed=true` appends a full record page per
+ * registrant (including their payment history) after the summary listing.
+ */
+router.get('/export/registrations/pdf', async (req, res, next) => {
+  try {
+    const detailed = req.query.detailed === 'true';
+    const { where, params } = registrationFilters(req.query);
+
+    const [rows] = await query(
+      `SELECT ${REGISTRATION_PDF_COLUMNS}
+       FROM registrants r
+       WHERE ${where}
+       ORDER BY r.created_at DESC`,
+      params
+    );
+
+    // The detailed pack embeds each registrant's payments; one grouped query
+    // keeps this off the N+1 path for large exports.
+    if (detailed && rows.length) {
+      const [allPayments] = await query(
+        `SELECT p.* FROM payments p WHERE p.registrant_id IN (${rows.map(() => '?').join(',')})
+         ORDER BY p.created_at DESC`,
+        rows.map((r) => r.id)
+      );
+      const byRegistrant = new Map();
+      allPayments.forEach((p) => {
+        if (!byRegistrant.has(p.registrant_id)) byRegistrant.set(p.registrant_id, []);
+        byRegistrant.get(p.registrant_id).push(p);
+      });
+      rows.forEach((r) => { r.payments = byRegistrant.get(r.id) || []; });
+    }
+
+    const buffer = await pdfService.buildRegistrationsReportPdf(rows, {
+      filterSummary: describeFilters(req.query),
+      detailed,
+    });
+
+    await auditLog(adminRef(req), 'EXPORT_PDF', 'registrants', null,
+      `Bulk registrations PDF (${rows.length} records${detailed ? ', detailed' : ''})`);
+
+    return sendPdf(res, buffer, `amc2027-registrations-${Date.now()}.pdf`);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ─── GET /api/admin/export/payments/pdf ───────────────────────────────────────
+
+router.get('/export/payments/pdf', async (req, res, next) => {
+  try {
+    const { where, params } = paymentFilters(req.query);
+
+    const [rows] = await query(
+      `SELECT ${PAYMENT_COLUMNS}
+       ${PAYMENT_JOIN}
+       WHERE ${where}
+       ORDER BY ${DERIVED_DATE} DESC`,
+      params
+    );
+
+    const buffer = await pdfService.buildPaymentsReportPdf(rows, {
+      filterSummary: describeFilters(req.query),
+    });
+
+    await auditLog(adminRef(req), 'EXPORT_PDF', 'payments', null,
+      `Bulk payments PDF (${rows.length} records)`);
+
+    return sendPdf(res, buffer, `amc2027-payments-${Date.now()}.pdf`);
   } catch (err) {
     next(err);
   }
@@ -371,7 +576,7 @@ router.patch('/settings', async (req, res, next) => {
     }
 
     await auditLog(
-      req.auth.userId,
+      adminRef(req),
       'UPDATE_SETTINGS',
       'conference_settings',
       null,
@@ -456,7 +661,7 @@ router.post('/resources', async (req, res, next) => {
       [String(title).trim(), description || '', resourceCategory(category), speaker_name || '',
        file_url || '', external_url || '', Number(file_size) || 0, published === false ? 0 : 1, display_order || 0]
     );
-    await auditLog(req.auth?.userId, 'create', 'resources', result.insertId, title);
+    await auditLog(adminRef(req), 'create', 'resources', result.insertId, title);
     res.status(201).json({ id: result.insertId });
   } catch (err) { next(err); }
 });
@@ -472,7 +677,7 @@ router.put('/resources/:id', async (req, res, next) => {
       [String(title).trim(), description || '', resourceCategory(category), speaker_name || '',
        file_url || '', external_url || '', Number(file_size) || 0, published === false ? 0 : 1, display_order || 0, req.params.id]
     );
-    await auditLog(req.auth?.userId, 'update', 'resources', req.params.id, title);
+    await auditLog(adminRef(req), 'update', 'resources', req.params.id, title);
     res.json({ ok: true });
   } catch (err) { next(err); }
 });
@@ -480,7 +685,7 @@ router.put('/resources/:id', async (req, res, next) => {
 router.delete('/resources/:id', async (req, res, next) => {
   try {
     await query('DELETE FROM resources WHERE id=?', [req.params.id]);
-    await auditLog(req.auth?.userId, 'delete', 'resources', req.params.id, null);
+    await auditLog(adminRef(req), 'delete', 'resources', req.params.id, null);
     res.json({ ok: true });
   } catch (err) { next(err); }
 });
@@ -504,7 +709,7 @@ router.post('/award-categories', async (req, res, next) => {
        VALUES (?, ?, ?, ?, ?)`,
       [String(title).trim(), description || '', criteria || '', published === false ? 0 : 1, display_order || 0]
     );
-    await auditLog(req.auth?.userId, 'create', 'award_categories', result.insertId, title);
+    await auditLog(adminRef(req), 'create', 'award_categories', result.insertId, title);
     res.status(201).json({ id: result.insertId });
   } catch (err) { next(err); }
 });
@@ -518,7 +723,7 @@ router.put('/award-categories/:id', async (req, res, next) => {
       `UPDATE award_categories SET title=?, description=?, criteria=?, published=?, display_order=? WHERE id=?`,
       [String(title).trim(), description || '', criteria || '', published === false ? 0 : 1, display_order || 0, req.params.id]
     );
-    await auditLog(req.auth?.userId, 'update', 'award_categories', req.params.id, title);
+    await auditLog(adminRef(req), 'update', 'award_categories', req.params.id, title);
     res.json({ ok: true });
   } catch (err) { next(err); }
 });
@@ -526,7 +731,7 @@ router.put('/award-categories/:id', async (req, res, next) => {
 router.delete('/award-categories/:id', async (req, res, next) => {
   try {
     await query('DELETE FROM award_categories WHERE id=?', [req.params.id]);
-    await auditLog(req.auth?.userId, 'delete', 'award_categories', req.params.id, null);
+    await auditLog(adminRef(req), 'delete', 'award_categories', req.params.id, null);
     res.json({ ok: true });
   } catch (err) { next(err); }
 });
