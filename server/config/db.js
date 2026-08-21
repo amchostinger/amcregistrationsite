@@ -5,6 +5,23 @@
 
 const mysql = require('mysql2/promise');
 
+/**
+ * Every timestamp in the schema is a MySQL TIMESTAMP written by NOW() /
+ * CURRENT_TIMESTAMP — i.e. the session's wall clock. Both halves of that
+ * conversation have to agree on which zone that wall clock is in:
+ *
+ *   - DB_TIMEZONE pins the *session* zone so MySQL never falls back to SYSTEM
+ *     (this host's /etc/timezone and /etc/localtime disagree, and a SYSTEM zone
+ *     that drifts would silently re-date every record).
+ *   - The same value goes to mysql2 so it parses those wall-clock strings back
+ *     into the correct instant.
+ *
+ * These two were previously mismatched — MySQL wrote Harare time, mysql2 read
+ * it as UTC — which pushed anything recorded after 22:00 onto the following day
+ * once the browser rendered it back in local time.
+ */
+const DB_TIMEZONE = process.env.DB_TIMEZONE || '+02:00';
+
 // Create a connection pool for efficient connection reuse
 const pool = mysql.createPool({
   host: process.env.DB_HOST || 'localhost',
@@ -15,8 +32,15 @@ const pool = mysql.createPool({
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
-  timezone: '+00:00', // Store all times in UTC
+  timezone: DB_TIMEZONE,
   charset: 'utf8mb4',
+});
+
+// Pin the session zone on every new pooled connection, reconnects included.
+pool.on('connection', (conn) => {
+  conn.query('SET time_zone = ?', [DB_TIMEZONE], (err) => {
+    if (err) console.error('[DB] Could not pin session time_zone:', err.message);
+  });
 });
 
 /**

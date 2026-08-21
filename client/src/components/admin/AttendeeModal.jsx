@@ -7,7 +7,9 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import toast from 'react-hot-toast';
 import { adminApi, setAuthToken } from '../../lib/api';
-import { formatCurrency, formatDate, getStatusBadgeClass } from '../../lib/utils';
+import {
+  formatCurrency, formatDate, getStatusBadgeClass, downloadBlob, downloadErrorMessage,
+} from '../../lib/utils';
 
 export default function AttendeeModal({ registrantId, onClose, onStatusUpdate }) {
   const { getToken } = useAuth();
@@ -15,6 +17,9 @@ export default function AttendeeModal({ registrantId, onClose, onStatusUpdate })
   const [loading, setLoading] = useState(true);
   const [statusUpdating, setStatusUpdating] = useState(false);
   const [newStatus, setNewStatus] = useState('');
+  // Name of the action in flight, so only that button shows a spinner label.
+  const [busyAction, setBusyAction] = useState(null);
+  const [emailConfig, setEmailConfig] = useState(null);
 
   useEffect(() => {
     const load = async () => {
@@ -24,6 +29,11 @@ export default function AttendeeModal({ registrantId, onClose, onStatusUpdate })
         const { data: res } = await adminApi.getRegistration(registrantId);
         setData(res);
         setNewStatus(res.registrant.registration_status);
+        // Where copies go is worth showing next to the buttons; not worth
+        // failing the whole modal over if the lookup errors.
+        adminApi.emailStatus()
+          .then(({ data: cfg }) => setEmailConfig(cfg))
+          .catch(() => setEmailConfig(null));
       } catch {
         toast.error('Failed to load registrant details.');
         onClose();
@@ -50,25 +60,52 @@ export default function AttendeeModal({ registrantId, onClose, onStatusUpdate })
     }
   };
 
-  const handleResendConfirmation = async () => {
+  /**
+   * Run an email action and report what the server actually did. The success
+   * toast quotes the address the mail went to, so an admin can tell at a glance
+   * that it reached the registrant on file and not a stale address.
+   */
+  const runEmailAction = async (action, request) => {
+    setBusyAction(action);
     try {
       const token = await getToken();
       setAuthToken(token);
-      await adminApi.resendConfirmation(registrantId);
-      toast.success('Confirmation email resent.');
-    } catch {
-      toast.error('Failed to resend email.');
+      const { data: res } = await request();
+      toast.success(res.message || 'Email sent.');
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to send email.');
+    } finally {
+      setBusyAction(null);
     }
   };
 
-  const handleResendPayment = async () => {
+  const handleDownloadPdf = async () => {
+    setBusyAction('pdf');
     try {
       const token = await getToken();
       setAuthToken(token);
-      await adminApi.resendPayment(registrantId);
-      toast.success('Payment confirmation email resent.');
+      const { data: blob } = await adminApi.registrationPdf(registrantId);
+      downloadBlob(blob, `AMC2027-registration-${data.registrant.registration_ref}.pdf`);
+      toast.success('Registration PDF downloaded.');
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to resend email.');
+      toast.error(await downloadErrorMessage(err, 'Failed to generate PDF.'));
+    } finally {
+      setBusyAction(null);
+    }
+  };
+
+  const handleDownloadReceipt = async (paymentId, ref) => {
+    setBusyAction(`receipt-${paymentId}`);
+    try {
+      const token = await getToken();
+      setAuthToken(token);
+      const { data: blob } = await adminApi.paymentPdf(paymentId);
+      downloadBlob(blob, `AMC2027-receipt-${ref}-${paymentId}.pdf`);
+      toast.success('Receipt downloaded.');
+    } catch (err) {
+      toast.error(await downloadErrorMessage(err, 'Failed to generate receipt.'));
+    } finally {
+      setBusyAction(null);
     }
   };
 
@@ -91,6 +128,13 @@ export default function AttendeeModal({ registrantId, onClose, onStatusUpdate })
       ? registrant.delegate_details
       : [];
 
+  // Drives which email actions are offered. The server enforces both rules too;
+  // disabling here just saves the admin a round-trip to be told "no".
+  const balanceDue = Math.max(0, Number(
+    registrant.balance_due ?? (Number(registrant.grand_total || 0) - Number(registrant.amount_paid || 0))
+  ));
+  const hasSettledPayment = payments.some((p) => p.status === 'paid');
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-3 sm:p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[92vh] overflow-y-auto scrollbar-thin">
@@ -102,7 +146,16 @@ export default function AttendeeModal({ registrantId, onClose, onStatusUpdate })
               {registrant.designation} {registrant.first_name} {registrant.last_name}
             </h3>
           </div>
-          <button onClick={onClose} className="text-white/70 hover:text-white text-2xl leading-none flex-shrink-0">×</button>
+          <div className="flex items-center gap-3 flex-shrink-0">
+            <button
+              onClick={handleDownloadPdf}
+              disabled={busyAction === 'pdf'}
+              className="border border-gold/60 text-gold hover:bg-gold hover:text-navy transition-colors rounded-lg px-3 py-1.5 text-xs font-semibold whitespace-nowrap disabled:opacity-50"
+            >
+              {busyAction === 'pdf' ? 'Preparing…' : 'Download PDF'}
+            </button>
+            <button onClick={onClose} className="text-white/70 hover:text-white text-2xl leading-none">×</button>
+          </div>
         </div>
 
         <div className="p-4 sm:p-6 space-y-6">
@@ -190,14 +243,23 @@ export default function AttendeeModal({ registrantId, onClose, onStatusUpdate })
             ) : (
               <div className="space-y-2">
                 {payments.map((p) => (
-                  <div key={p.id} className="flex items-center justify-between bg-gray-50 rounded-lg p-3 text-sm">
-                    <div>
+                  <div key={p.id} className="flex items-center justify-between gap-3 bg-gray-50 rounded-lg p-3 text-sm">
+                    <div className="min-w-0">
                       <p className="font-semibold">{formatCurrency(p.amount)} {p.currency}</p>
-                      <p className="text-gray-500 capitalize">{p.payment_method} · {formatDate(p.created_at)}</p>
+                      <p className="text-gray-500 capitalize">{p.payment_method} · {formatDate(p.paid_at || p.created_at)}</p>
                     </div>
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${getStatusBadgeClass(p.status)}`}>
-                      {p.status}
-                    </span>
+                    <div className="flex items-center gap-3 flex-shrink-0">
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${getStatusBadgeClass(p.status)}`}>
+                        {p.status}
+                      </span>
+                      <button
+                        onClick={() => handleDownloadReceipt(p.id, registrant.registration_ref)}
+                        disabled={busyAction === `receipt-${p.id}`}
+                        className="text-navy hover:text-gold text-xs font-semibold underline whitespace-nowrap disabled:opacity-50"
+                      >
+                        {busyAction === `receipt-${p.id}` ? 'Preparing…' : 'PDF'}
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -229,13 +291,35 @@ export default function AttendeeModal({ registrantId, onClose, onStatusUpdate })
 
           {/* Email Actions */}
           <div>
-            <h4 className="font-heading font-semibold text-navy mb-3">Email Actions</h4>
-            <div className="flex flex-col sm:flex-row gap-3">
-              <button onClick={handleResendConfirmation} className="btn-outline py-2 px-4 text-sm flex-1">
-                Resend Registration Email
+            <h4 className="font-heading font-semibold text-navy mb-1">Email Actions</h4>
+            <p className="text-xs text-gray-500 mb-3">
+              Sent to <span className="font-semibold text-gray-700">{registrant.email}</span> using this
+              registrant&rsquo;s current record
+              {emailConfig?.archiveTo && <>, with a copy to <span className="font-semibold text-gray-700">{emailConfig.archiveTo}</span></>}.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <button
+                onClick={() => runEmailAction('confirmation', () => adminApi.resendConfirmation(registrantId))}
+                disabled={busyAction === 'confirmation'}
+                className="btn-outline py-2 px-4 text-sm disabled:opacity-50"
+              >
+                {busyAction === 'confirmation' ? 'Sending…' : 'Registration Email'}
               </button>
-              <button onClick={handleResendPayment} className="btn-outline py-2 px-4 text-sm flex-1">
-                Resend Payment Email
+              <button
+                onClick={() => runEmailAction('payment', () => adminApi.resendPayment(registrantId))}
+                disabled={busyAction === 'payment' || !hasSettledPayment}
+                title={hasSettledPayment ? '' : 'No confirmed payment on this registration yet'}
+                className="btn-outline py-2 px-4 text-sm disabled:opacity-50"
+              >
+                {busyAction === 'payment' ? 'Sending…' : 'Payment Confirmation'}
+              </button>
+              <button
+                onClick={() => runEmailAction('reminder', () => adminApi.sendPaymentReminder(registrantId))}
+                disabled={busyAction === 'reminder' || balanceDue <= 0}
+                title={balanceDue > 0 ? '' : 'Nothing outstanding on this registration'}
+                className="btn-outline py-2 px-4 text-sm disabled:opacity-50"
+              >
+                {busyAction === 'reminder' ? 'Sending…' : 'Payment Reminder'}
               </button>
             </div>
           </div>

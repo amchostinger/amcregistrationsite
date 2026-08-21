@@ -86,7 +86,7 @@ export function inDateRange(value, from, to) {
 }
 
 /**
- * Trigger a browser CSV download from a Blob.
+ * Trigger a browser file download from a Blob (CSV and PDF exports).
  */
 export function downloadBlob(blob, filename) {
   const url = window.URL.createObjectURL(blob);
@@ -98,6 +98,25 @@ export function downloadBlob(blob, filename) {
 }
 
 /**
+ * Pull a readable message out of a failed download.
+ *
+ * Requests made with responseType:'blob' hand back the *error* body as a Blob
+ * too, so `err.response.data.error` is undefined and the admin would otherwise
+ * only ever see the generic fallback. Read the blob back as text first.
+ */
+export async function downloadErrorMessage(err, fallback) {
+  const data = err?.response?.data;
+  if (data instanceof Blob) {
+    try {
+      return JSON.parse(await data.text()).error || fallback;
+    } catch {
+      return fallback;
+    }
+  }
+  return data?.error || fallback;
+}
+
+/**
  * Badge colour mapping for registration/payment statuses.
  */
 export function getStatusBadgeClass(status) {
@@ -105,6 +124,8 @@ export function getStatusBadgeClass(status) {
     confirmed: 'bg-green-100 text-green-700',
     paid:       'bg-green-100 text-green-700',
     pending:    'bg-yellow-100 text-yellow-700',
+    // Registered but never started a payment — distinct from a pending attempt.
+    unpaid:     'bg-orange-100 text-orange-700',
     failed:     'bg-red-100 text-red-700',
     cancelled:  'bg-gray-100 text-gray-600',
     refunded:   'bg-purple-100 text-purple-700',

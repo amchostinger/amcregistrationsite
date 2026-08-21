@@ -8,7 +8,11 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
-import { getStatusBadgeClass, formatCurrency, formatDate } from '../../lib/utils';
+import toast from 'react-hot-toast';
+import {
+  getStatusBadgeClass, formatCurrency, formatDate, downloadBlob, downloadErrorMessage,
+} from '../../lib/utils';
+import { adminApi } from '../../lib/api';
 import FilterBar from './FilterBar';
 import AttendeeModal from './AttendeeModal';
 
@@ -20,6 +24,20 @@ export default function RegistrationsTable({
 }) {
   const [selectedId, setSelectedId] = useState(null);
   const [filters, setFilters] = useState(BLANK);
+  // id of the row whose PDF is being built, so only that row shows progress.
+  const [pdfRowId, setPdfRowId] = useState(null);
+
+  const downloadPdf = async (registrant) => {
+    setPdfRowId(registrant.id);
+    try {
+      const { data } = await adminApi.registrationPdf(registrant.id);
+      downloadBlob(data, `AMC2027-registration-${registrant.registration_ref}.pdf`);
+    } catch (err) {
+      toast.error(await downloadErrorMessage(err, 'Failed to generate PDF.'));
+    } finally {
+      setPdfRowId(null);
+    }
+  };
 
   // Typing shouldn't fire a request per keystroke.
   const debounce = useRef(null);
@@ -127,12 +145,20 @@ export default function RegistrationsTable({
                   </span>
                 </td>
                 <td className="py-3 px-4 text-gray-500 whitespace-nowrap">{formatDate(r.created_at)}</td>
-                <td className="py-3 px-4">
+                <td className="py-3 px-4 whitespace-nowrap">
                   <button
                     className="text-navy hover:text-gold text-xs font-semibold underline"
                     onClick={() => setSelectedId(r.id)}
                   >
                     View
+                  </button>
+                  <span className="text-gray-300 mx-2">|</span>
+                  <button
+                    className="text-navy hover:text-gold text-xs font-semibold underline disabled:opacity-50"
+                    disabled={pdfRowId === r.id}
+                    onClick={() => downloadPdf(r)}
+                  >
+                    {pdfRowId === r.id ? '…' : 'PDF'}
                   </button>
                 </td>
               </tr>
