@@ -1,5 +1,5 @@
 ﻿import { useState, useEffect } from "react";
-import { X, MapPin, Wifi, Coffee, Car, Dumbbell, CheckCircle, Info, AlertTriangle } from "lucide-react";
+import { MapPin, Wifi, Coffee, Car, Dumbbell, Info, AlertTriangle } from "lucide-react";
 import api from "../lib/api";
 
 const HOTEL_IMAGES = [
@@ -51,188 +51,6 @@ function Stars({ n }) {
   );
 }
 
-function ReserveModal({ hotel, onClose, onSuccess }) {
-  const [form, setForm] = useState({ name: "", email: "", rooms: 1 });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const totalCost = form.rooms * hotel.price_usd * NIGHTS;
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!form.name.trim() || !form.email.trim()) { setError("Please fill in your name and email."); return; }
-    setLoading(true); setError("");
-    try {
-      const res = await api.post("/hotels/reserve", { hotel_id: hotel.id, guest_name: form.name.trim(), guest_email: form.email.trim().toLowerCase(), rooms: form.rooms, nights: NIGHTS });
-      onSuccess(res.data);
-    } catch (err) {
-      setError(err.response?.data?.error || "Reservation failed. Please try again.");
-    } finally { setLoading(false); }
-  };
-
-  useEffect(() => {
-    const handler = (e) => { if (e.key === "Escape") onClose(); };
-    document.addEventListener("keydown", handler);
-    document.body.style.overflow = "hidden";
-    return () => { document.removeEventListener("keydown", handler); document.body.style.overflow = ""; };
-  }, [onClose]);
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: "rgba(5,15,30,0.7)", backdropFilter: "blur(8px)" }}
-      onClick={onClose}>
-      <div className="bg-white rounded-2xl max-w-md w-full relative overflow-hidden"
-        style={{ boxShadow: "var(--shadow-xl)" }}
-        onClick={(e) => e.stopPropagation()}>
-        <div className="h-2 w-full" style={{ background: "var(--gold-gradient)" }} />
-        <div className="p-7">
-          <button onClick={onClose} className="absolute top-5 right-5 w-9 h-9 flex items-center justify-center rounded-xl hover:bg-gray-100 transition-colors text-gray-400"><X size={18} /></button>
-          <h2 style={{ fontFamily: "Cinzel, serif", color: "var(--color-navy)" }} className="text-xl font-bold mb-0.5">Reserve Room</h2>
-          <p className="font-body text-sm mb-6" style={{ color: "var(--color-muted)" }}>{hotel.name}</p>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div><label className="form-label">Full Name</label><input type="text" className="form-input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Your full name" required /></div>
-            <div><label className="form-label">Email Address</label><input type="email" className="form-input" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="your@email.com" required /></div>
-            <div><label className="form-label">Rooms</label>
-              <select className="form-input" value={form.rooms} onChange={(e) => setForm({ ...form, rooms: parseInt(e.target.value, 10) })}>
-                {[1,2,3,4].map((n) => <option key={n} value={n}>{n}</option>)}
-              </select>
-            </div>
-            <div className="rounded-xl p-4" style={{ background: "var(--color-cream-dark)" }}>
-              <div className="flex justify-between font-body text-sm mb-1">
-                <span style={{ color: "var(--color-muted)" }}>${hotel.price_usd} &times; {form.rooms} room{form.rooms > 1 ? "s" : ""} &times; {NIGHTS} nights</span>
-                <span className="font-bold" style={{ color: "var(--color-navy)" }}>${totalCost.toFixed(2)}</span>
-              </div>
-              <p className="text-xs font-body" style={{ color: "var(--color-muted)" }}>Check-in: 9 Mar &middot; Check-out: 14 Mar 2027</p>
-              <p className="text-xs font-body mt-1 font-semibold" style={{ color: "var(--color-gold)" }}>Reservation held for 2 hours &mdash; confirm after registration payment.</p>
-            </div>
-            {error && <p className="font-body text-xs text-red-600">{error}</p>}
-            <button type="submit" className="btn-gold w-full" disabled={loading}>{loading ? "Reserving..." : "Confirm Reservation"}</button>
-          </form>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function SuccessBanner({ booking, onClose }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(5,15,30,0.7)", backdropFilter: "blur(8px)" }}>
-      <div className="bg-white rounded-2xl max-w-sm w-full p-8 text-center" style={{ boxShadow: "var(--shadow-xl)" }}>
-        <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ background: "rgba(5,150,105,0.1)" }}>
-          <CheckCircle size={32} className="text-emerald-600" />
-        </div>
-        <h2 style={{ fontFamily: "Cinzel, serif", color: "var(--color-navy)" }} className="text-xl font-bold mb-2">Reserved!</h2>
-        <p className="font-body text-sm mb-5" style={{ color: "var(--color-muted)" }}>
-          Booking #{booking.booking_id} &middot; ${booking.total_usd?.toFixed(2)}<br />
-          Held for 2 hours. Complete your registration to confirm.
-        </p>
-        <button className="btn-primary w-full" onClick={onClose}>Done</button>
-      </div>
-    </div>
-  );
-}
-
-function HotelCard({ hotel, onReserve, imgIndex }) {
-  const pct = hotel.total_rooms > 0 ? Math.round((hotel.available_rooms / hotel.total_rooms) * 100) : 0;
-  const status = hotel.available_rooms === 0 ? "sold-out" : pct < 25 ? "low" : "available";
-  const statusLabel = { "sold-out": "Sold Out", low: "Few Left", available: "Available" }[status];
-  const statusColor = { "sold-out": "#ef4444", low: "#f59e0b", available: "#22c55e" }[status];
-  const imgSrc = hotelImage(hotel, imgIndex);
-  const amenities = Array.isArray(hotel.amenities) ? hotel.amenities : (typeof hotel.amenities === "string" ? JSON.parse(hotel.amenities || "[]") : []);
-  const websiteUrl = normalizeWebsiteUrl(hotel.website_url);
-
-  return (
-    <div className="rounded-2xl overflow-hidden flex flex-col bg-white transition-all duration-300 hover:-translate-y-1"
-      style={{ border: "1px solid rgba(232,224,208,0.8)", boxShadow: "var(--shadow-card)" }}>
-      <div className="relative overflow-hidden h-44">
-        <img src={imgSrc} alt={hotel.name} className="w-full h-full object-cover transition-transform duration-500 hover:scale-105" loading="lazy"
-          onError={(e) => { e.target.src = HOTEL_IMAGES[0]; }} />
-        <div className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(15,30,51,0.5), transparent)" }} />
-        <div className="absolute top-3 left-3 flex gap-2">
-          {hotel.distance_km === 0 && (
-            <span className="text-[10px] font-body font-bold uppercase tracking-widest px-2.5 py-1 rounded-full text-navy" style={{ background: "var(--color-gold)" }}>Official Venue</span>
-          )}
-        </div>
-        <div className="absolute top-3 right-3">
-          <span className="text-[10px] font-body font-bold uppercase tracking-widest px-2.5 py-1 rounded-full text-white" style={{ background: statusColor }}>
-            {statusLabel}
-          </span>
-        </div>
-      </div>
-
-      <div className="p-5 flex flex-col flex-1">
-        <div className="flex items-start justify-between gap-2 mb-3">
-          <div className="flex-1 min-w-0">
-            <Stars n={hotel.stars} />
-            <h3 className="font-body font-bold text-navy text-base mt-1 leading-snug">{hotel.name}</h3>
-            {hotel.address && (
-              <p className="flex items-center gap-1 font-body text-xs text-gray-500 mt-0.5"><MapPin size={10} />{hotel.address}</p>
-            )}
-          </div>
-          <div className="text-right flex-shrink-0">
-            <p className="font-body font-bold text-lg leading-none" style={{ color: "var(--color-navy)" }}>${hotel.price_usd}</p>
-            <p className="font-body text-xs text-gray-400">/night</p>
-          </div>
-        </div>
-
-        {hotel.distance_km > 0 && (
-          <p className="font-body text-xs text-gray-500 mb-2">{hotel.distance_km} km from conference venue</p>
-        )}
-
-        {hotel.description && (
-          <p className="font-body text-xs text-gray-500 leading-relaxed mb-3 line-clamp-2">{hotel.description}</p>
-        )}
-
-        {websiteUrl && (
-          <a
-            href={websiteUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-xs font-semibold mb-3 transition-all duration-200 hover:-translate-y-0.5"
-            style={{ background: "rgba(201,168,76,0.14)", color: "var(--color-navy)", border: "1px solid rgba(201,168,76,0.35)" }}
-          >
-            <span>Visit website</span>
-            <span className="text-[11px]">↗</span>
-          </a>
-        )}
-
-        {amenities.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mb-4">
-            {amenities.slice(0, 4).map((a) => (
-              <span key={a} className="text-[10px] font-body px-2 py-0.5 rounded-full"
-                style={{ background: "rgba(26,47,78,0.06)", color: "var(--color-navy)" }}>{a}</span>
-            ))}
-            {amenities.length > 4 && (
-              <span className="text-[10px] font-body px-2 py-0.5 rounded-full" style={{ background: "rgba(26,47,78,0.06)", color: "var(--color-muted)" }}>+{amenities.length - 4}</span>
-            )}
-          </div>
-        )}
-
-        <div className="mt-auto">
-          <div className="flex justify-between items-center text-xs font-body mb-3">
-            <span className="text-gray-500">{hotel.available_rooms} of {hotel.total_rooms} rooms available</span>
-            <span className="font-semibold" style={{ color: "var(--color-gold)" }}>${hotel.price_usd * NIGHTS}/5 nights</span>
-          </div>
-          {hotel.available_rooms > 0 && (
-            <div className="h-1.5 rounded-full mb-4 overflow-hidden" style={{ background: "rgba(26,47,78,0.08)" }}>
-              <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: pct < 25 ? "#f59e0b" : "var(--color-gold)" }} />
-            </div>
-          )}
-          <button
-            onClick={() => onReserve(hotel)}
-            disabled={hotel.available_rooms === 0}
-            className="w-full py-3 rounded-xl font-body font-bold text-sm transition-all duration-200 hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-            style={hotel.available_rooms > 0
-              ? { background: "var(--gold-gradient)", color: "var(--color-navy)", boxShadow: "0 2px 12px rgba(201,168,76,0.3)" }
-              : { background: "#f3f4f6", color: "#9ca3af" }
-            }>
-            {hotel.available_rooms === 0 ? "Sold Out" : "Reserve Room"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function groupHotels(hotels) {
   const groups = new Map();
   hotels.forEach((hotel) => {
@@ -262,7 +80,7 @@ function groupHotels(hotels) {
   return Array.from(groups.values());
 }
 
-function GroupedHotelCard({ group, onReserve, imgIndex }) {
+function GroupedHotelCard({ group, imgIndex }) {
   const imgSrc = hotelImage(group, imgIndex);
   const lowAvailability = group.total_rooms > 0 ? Math.round((group.available_rooms / group.total_rooms) * 100) < 25 : false;
   const groupAvailable = group.available_rooms > 0;
@@ -350,16 +168,21 @@ function GroupedHotelCard({ group, onReserve, imgIndex }) {
                   <p className="font-body text-xs text-gray-500 mt-1">${selectedVariant.price_usd} / night · ${selectedVariant.price_usd * NIGHTS}/5 nights</p>
                   <p className="font-body text-xs text-gray-500 mt-1">{selectedVariant.available_rooms} rooms available</p>
                 </div>
-                <button
-                  onClick={() => onReserve(selectedVariant)}
-                  disabled={selectedVariant.available_rooms === 0}
-                  className="w-full max-w-[140px] py-3 rounded-xl font-body font-bold text-sm transition-all duration-200 hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-                  style={selectedVariant.available_rooms > 0
-                    ? { background: "var(--gold-gradient)", color: "var(--color-navy)", boxShadow: "0 2px 12px rgba(201,168,76,0.3)" }
-                    : { background: "#f3f4f6", color: "#9ca3af" }
-                  }>
-                  {selectedVariant.available_rooms === 0 ? "Sold Out" : "Reserve Room"}
-                </button>
+                {websiteUrl ? (
+                  <a
+                    href={websiteUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="w-full max-w-[150px] text-center py-3 rounded-xl font-body font-bold text-sm transition-all duration-200 hover:-translate-y-0.5"
+                    style={{ background: "var(--gold-gradient)", color: "var(--color-navy)", boxShadow: "0 2px 12px rgba(201,168,76,0.3)" }}
+                  >
+                    Book with hotel
+                  </a>
+                ) : (
+                  <span className="max-w-[150px] font-body text-xs text-right text-gray-500">
+                    Contact the hotel directly to book this room type.
+                  </span>
+                )}
               </div>
             </div>
           )}
@@ -373,8 +196,6 @@ export default function Hotels() {
   const [hotels, setHotels] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [selectedHotel, setSelectedHotel] = useState(null);
-  const [successBooking, setSuccessBooking] = useState(null);
   const groupedHotels = groupHotels(hotels);
 
   useEffect(() => {
@@ -384,8 +205,6 @@ export default function Hotels() {
       .catch(() => setError("Unable to load hotels. Please check the server is running."))
       .finally(() => setLoading(false));
   }, []);
-
-  const handleSuccess = (booking) => { setSelectedHotel(null); setSuccessBooking(booking); };
 
   return (
     <div className="min-h-screen" style={{ background: "var(--color-cream)" }}>
@@ -406,7 +225,8 @@ export default function Hotels() {
         <div className="rounded-2xl p-5 mb-10 flex items-start gap-4" style={{ background: "rgba(201,168,76,0.08)", border: "1px solid rgba(201,168,76,0.25)" }}>
           <Info size={18} style={{ color: "var(--color-gold)", flexShrink: 0, marginTop: 2 }} />
           <p className="font-body text-sm" style={{ color: "var(--color-navy)" }}>
-            Hotel reservations are held for <strong>2 hours</strong> while you complete registration. Prices shown are per room per night.
+            Accommodation is booked <strong>directly with the hotel</strong> and paid for separately from your conference
+            registration. Prices shown are per room per night and are a guide only &mdash; confirm them with the hotel.
             Conference dates: <strong>9&ndash;14 March 2027</strong> (5 nights).
           </p>
         </div>
@@ -433,13 +253,11 @@ export default function Hotels() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
           {groupedHotels.map((group, i) => (
-            <GroupedHotelCard key={group.groupKey} group={group} onReserve={setSelectedHotel} imgIndex={i} />
+            <GroupedHotelCard key={group.groupKey} group={group} imgIndex={i} />
           ))}
         </div>
       </div>
 
-      {selectedHotel && <ReserveModal hotel={selectedHotel} onClose={() => setSelectedHotel(null)} onSuccess={handleSuccess} />}
-      {successBooking && <SuccessBanner booking={successBooking} onClose={() => setSuccessBooking(null)} />}
     </div>
   );
 }

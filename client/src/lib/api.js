@@ -53,6 +53,19 @@ export const registrationApi = {
 export const paymentApi = {
   initiate: (data) => api.post('/payments/initiate', data),
   poll: (paymentId) => api.get(`/payments/poll/${paymentId}`),
+  /**
+   * Upload proof of a bank transfer. Paynow cannot take a direct transfer, so
+   * the delegate sends the slip here and an admin confirms it by hand.
+   * Nothing is credited by the upload itself.
+   */
+  uploadProof: ({ file, ref, paymentId }) => {
+    const form = new FormData();
+    form.append('proof', file);
+    form.append('ref', ref);
+    if (paymentId) form.append('paymentId', paymentId);
+    // Let the browser set the multipart boundary.
+    return api.post('/payments/proof', form, { headers: { 'Content-Type': undefined } });
+  },
 };
 
 // ─── Admin API ────────────────────────────────────────────────────────────────
@@ -66,6 +79,16 @@ export const adminApi = {
   // Accepts the same filter params as getRegistrations, so an export mirrors
   // whatever the admin has filtered down to on screen.
   exportCsv: (params) => api.get('/admin/export/csv', { params, responseType: 'blob' }),
+  // ── Payments taken outside Paynow (bank transfers) ──
+  // Recording or confirming one is what adds it to the revenue figures.
+  recordPayment: (payload) => api.post('/admin/payments', payload),
+  updatePayment: (id, payload) => api.patch(`/admin/payments/${id}`, payload),
+  uploadPaymentProof: (file) => {
+    const form = new FormData();
+    form.append('proof', file);
+    return api.post('/uploads/payment-proof', form, { headers: { 'Content-Type': undefined } });
+  },
+
   getSettings: () => api.get('/admin/settings'),
   updateSettings: (settings) => api.patch('/admin/settings', settings),
 

@@ -7,7 +7,7 @@ import { useForm, useFieldArray } from 'react-hook-form';
 import { useState, useEffect } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { DESIGNATIONS, OFFICES } from '../../lib/utils';
+import { DESIGNATIONS, OFFICES, officeLabel } from '../../lib/utils';
 import api from '../../lib/api';
 
 // ─── Step 1 Schema ────────────────────────────────────────────────────────────
@@ -19,8 +19,18 @@ const step1Schema = z.object({
   phone:       z.string().max(30).optional(),
   country:     z.string().min(1, 'Country is required'),
   office:      z.string().min(1, 'Office is required'),
+  // Only asked for — and only required — when 'Other' is the chosen office.
+  office_other: z.string().max(150).optional(),
   category:    z.enum(['Delegate','Invited Guest','Observer'], { required_error: 'Category is required' }),
   church:      z.string().max(255).optional(),
+}).superRefine((data, ctx) => {
+  if (data.office === 'Other' && !String(data.office_other || '').trim()) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Please type your office / role',
+      path: ['office_other'],
+    });
+  }
 });
 
 // ─── Step 2 Schema ────────────────────────────────────────────────────────────
@@ -37,7 +47,16 @@ const step2Schema = z.object({
                           phone:       z.string().max(30).optional(),
                           country:     z.string().min(1, 'Country is required').max(100),
                           office:      z.string().min(1, 'Office is required'),
+                          office_other: z.string().max(150).optional(),
                           church:      z.string().max(255).optional(),
+                        }).superRefine((delegate, ctx) => {
+                          if (delegate.office === 'Other' && !String(delegate.office_other || '').trim()) {
+                            ctx.addIssue({
+                              code: z.ZodIssueCode.custom,
+                              message: 'Please type this delegate\'s office / role',
+                              path: ['office_other'],
+                            });
+                          }
                         })).optional(),
   dietary_requirements: z.string().max(1000).optional(),
   special_requests:    z.string().max(1000).optional(),
@@ -74,8 +93,12 @@ export function Step1Form({ defaultValues, onNext }) {
   const {
     register,
     handleSubmit,
+    watch,
     formState: { errors },
   } = useForm({ resolver: zodResolver(step1Schema), defaultValues });
+
+  // 'Other' is a bucket, not a job title — ask which role it actually is.
+  const officeIsOther = watch('office') === 'Other';
 
   return (
     <form onSubmit={handleSubmit(onNext)} className="space-y-5">
@@ -130,6 +153,18 @@ export function Step1Form({ defaultValues, onNext }) {
             {OFFICES.map((o) => <option key={o} value={o}>{o}</option>)}
           </select>
         </Field>
+
+        {/* Office — typed in, when the list does not cover it */}
+        {officeIsOther && (
+          <Field label="Please specify your office / role" error={errors.office_other?.message} required>
+            <input
+              className="form-input"
+              placeholder="e.g. Communications Officer"
+              maxLength={150}
+              {...register('office_other')}
+            />
+          </Field>
+        )}
 
         {/* Church */}
         <div className="sm:col-span-2">
@@ -230,6 +265,7 @@ export function Step2Form({ defaultValues, onNext, onBack }) {
           phone: '',
           country: '',
           office: '',
+          office_other: '',
           church: '',
         });
       }
@@ -457,7 +493,7 @@ export function Step2Form({ defaultValues, onNext, onBack }) {
               const isOpen = delegateOpen[index];
               const delegate = delegateValues[index] || {};
               const summaryName = delegate.first_name || delegate.last_name ? `${delegate.first_name || ''} ${delegate.last_name || ''}`.trim() : 'No name yet';
-              const summaryMeta = delegate.email || delegate.office ? `${delegate.email || 'No email'} · ${delegate.office || 'No office'}` : 'Fill in delegate details';
+              const summaryMeta = delegate.email || delegate.office ? `${delegate.email || 'No email'} · ${officeLabel(delegate) || 'No office'}` : 'Fill in delegate details';
               return (
                 <div key={field.id} className="rounded-xl border border-gray-200 bg-white shadow-sm">
                   <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-start sm:justify-between">
@@ -516,6 +552,16 @@ export function Step2Form({ defaultValues, onNext, onBack }) {
                             {OFFICES.map((o) => <option key={o} value={o}>{o}</option>)}
                           </select>
                         </Field>
+                        {delegate.office === 'Other' && (
+                          <Field label="Please specify office / role" error={errors.delegate_details?.[index]?.office_other?.message} required>
+                            <input
+                              className="form-input"
+                              placeholder="e.g. Communications Officer"
+                              maxLength={150}
+                              {...register(`delegate_details.${index}.office_other`)}
+                            />
+                          </Field>
+                        )}
                         <div className="sm:col-span-2">
                           <Field label="Church / Organisation" error={errors.delegate_details?.[index]?.church?.message}>
                             <input className="form-input" {...register(`delegate_details.${index}.church`)} />

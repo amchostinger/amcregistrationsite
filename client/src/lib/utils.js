@@ -144,6 +144,20 @@ export const DESIGNATIONS = [
 /**
  * Office list (mirrors DB ENUM)
  */
+/**
+ * What to print for someone's office/role.
+ *
+ * 'Other' is a bucket, not a job title — the title the registrant typed lives
+ * in office_other. Mirrors officeLabel() on the server so the dashboard, the
+ * PDFs and the emails all read the same.
+ */
+export function officeLabel(person) {
+  if (!person) return '';
+  const office = person.office || '';
+  if (office !== 'Other') return office;
+  return String(person.office_other || '').trim() || 'Other';
+}
+
 export const OFFICES = [
   'Administrative Assistant','Admin Bishop','AMC Executive Member','Bishop','Conference Secretary',
   'General Secretary','Prelate','Presiding Bishop','Secretary of Conference','Other',

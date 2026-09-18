@@ -16,6 +16,7 @@ const INITIAL_FORM = {
   phone: '',
   country: '',
   office: '',
+  office_other: '',
   category: '',
   church: '',
   // Step 2

@@ -54,7 +54,87 @@ const BANK_DETAILS = {
   accountName: 'Africa Methodist Council — Conference 2027',
 };
 
-function BankTransferConfirmation({ ref_, hotelName, hotelWebsiteUrl }) {
+
+/* ── Proof of Payment Upload ─────────────────────────────────────────────── */
+
+/**
+ * Paynow cannot collect a direct bank transfer, so the delegate uploads their
+ * bank slip here instead of emailing it. The upload credits nothing on its own:
+ * an admin checks it against the statement and confirms the payment, which is
+ * what moves the registration to confirmed.
+ */
+function ProofOfPaymentUpload({ ref_, paymentId }) {
+  const [file, setFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [done, setDone] = useState(false);
+  const [error, setError] = useState('');
+
+  const MAX_BYTES = 10 * 1024 * 1024;
+
+  const handleFile = (event) => {
+    const chosen = event.target.files?.[0] || null;
+    setError('');
+    if (chosen && chosen.size > MAX_BYTES) {
+      setFile(null);
+      setError('That file is larger than 10 MB. Please upload a smaller photo or PDF.');
+      return;
+    }
+    setFile(chosen);
+  };
+
+  const handleUpload = async (event) => {
+    event.preventDefault();
+    if (!file) { setError('Choose your proof of payment first.'); return; }
+    setUploading(true);
+    setError('');
+    try {
+      await paymentApi.uploadProof({ file, ref: ref_, paymentId });
+      setDone(true);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Upload failed. Please try again, or email the file to us.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  if (!ref_) return null;
+
+  if (done) {
+    return (
+      <div className="rounded-lg p-4 text-sm font-body mb-6" style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.35)' }}>
+        <strong>Proof of payment received.</strong> Our team will check it against the bank statement and
+        confirm your registration. You will get an email as soon as it is confirmed.
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={handleUpload} className="rounded-lg p-4 mb-6" style={{ background: 'rgba(26,47,78,0.04)', border: '1px solid rgba(26,47,78,0.15)' }}>
+      <p className="font-body font-semibold text-sm mb-1" style={{ color: 'var(--color-navy)' }}>
+        Upload your proof of payment
+      </p>
+      <p className="font-body text-xs mb-3" style={{ color: 'var(--color-muted)' }}>
+        A photo or PDF of your bank transfer slip &mdash; up to 10 MB. You can also send it by email if you prefer.
+      </p>
+
+      <input
+        type="file"
+        accept="application/pdf,image/jpeg,image/png,image/webp,image/heic"
+        onChange={handleFile}
+        className="block w-full font-body text-sm mb-3 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:cursor-pointer"
+        style={{ color: 'var(--color-charcoal)' }}
+      />
+
+      {error && <p className="font-body text-xs mb-3" style={{ color: '#b91c1c' }}>{error}</p>}
+
+      <button type="submit" className="btn-primary w-full" disabled={uploading || !file}>
+        {uploading ? 'Uploading…' : 'Upload proof of payment'}
+      </button>
+    </form>
+  );
+}
+
+function BankTransferConfirmation({ ref_, paymentId, hotelName, hotelWebsiteUrl }) {
   return (
     <div className="min-h-screen" style={{ background: 'var(--color-cream)' }}>
       <div className="pt-24 pb-14" style={{ background: 'var(--navy-gradient)' }}>
@@ -103,8 +183,10 @@ function BankTransferConfirmation({ ref_, hotelName, hotelWebsiteUrl }) {
             ))}
           </dl>
 
+          <ProofOfPaymentUpload ref_={ref_} paymentId={paymentId} />
+
           <div className="rounded-lg p-4 text-sm font-body mb-6" style={{ background: 'rgba(201,168,76,0.1)', border: '1px solid rgba(201,168,76,0.3)' }}>
-            <strong>Important:</strong> Email your proof of payment to{' '}
+            <strong>Prefer email?</strong> Send your proof of payment to{' '}
             <a href="mailto:conference@africamethodistcouncil.org" className="underline break-words" style={{ color: 'var(--color-navy)' }}>
               conference@africamethodistcouncil.org
             </a>{' '}
@@ -140,7 +222,7 @@ export default function PaymentStatus() {
 
   // Bank transfer — no polling needed, just show confirmation screen
   if (method === 'bank') {
-    return <BankTransferConfirmation ref_={ref} hotelName={registrant?.hotel_name} hotelWebsiteUrl={registrant?.hotel_website_url} />;
+    return <BankTransferConfirmation ref_={ref} paymentId={paymentId} hotelName={registrant?.hotel_name} hotelWebsiteUrl={registrant?.hotel_website_url} />;
   }
 
   const [status, setStatus] = useState('processing');

@@ -8,7 +8,7 @@ import { useAuth } from '../../hooks/useAuth';
 import toast from 'react-hot-toast';
 import { adminApi, setAuthToken } from '../../lib/api';
 import {
-  formatCurrency, formatDate, getStatusBadgeClass, downloadBlob, downloadErrorMessage,
+  formatCurrency, formatDate, getStatusBadgeClass, downloadBlob, downloadErrorMessage, officeLabel,
 } from '../../lib/utils';
 
 export default function AttendeeModal({ registrantId, onClose, onStatusUpdate }) {
@@ -167,7 +167,7 @@ export default function AttendeeModal({ registrantId, onClose, onStatusUpdate })
                 ['Email', registrant.email],
                 ['Phone', registrant.phone],
                 ['Category', registrant.category],
-                ['Office', registrant.office],
+                ['Office', officeLabel(registrant)],
                 ['Church', registrant.church],
                 ['Country', registrant.country],
                 ['Accommodation', registrant.accommodation ? `Yes – ${registrant.accommodation_nights} night(s)` : 'No'],
@@ -202,7 +202,7 @@ export default function AttendeeModal({ registrantId, onClose, onStatusUpdate })
                         ['Email', delegate.email],
                         ['Phone', delegate.phone],
                         ['Country', delegate.country],
-                        ['Office', delegate.office],
+                        ['Office', officeLabel(delegate)],
                         ['Church', delegate.church],
                       ].map(([label, value]) => value ? (
                         <div key={label} className="contents">

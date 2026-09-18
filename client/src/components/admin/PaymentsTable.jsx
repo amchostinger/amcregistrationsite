@@ -9,15 +9,18 @@ import toast from 'react-hot-toast';
 import {
   formatCurrency, formatDate, getStatusBadgeClass, downloadBlob, downloadErrorMessage,
 } from '../../lib/utils';
-import { adminApi } from '../../lib/api';
+import { adminApi, assetUrl } from '../../lib/api';
 import FilterBar from './FilterBar';
+import PaymentActionModal from './PaymentActionModal';
 
 const BLANK = { search: '', status: '', method: '', currency: '', date_from: '', date_to: '' };
 
-export default function PaymentsTable({ payments, total, totalPages, page, loading, onFilter, onPageChange }) {
+export default function PaymentsTable({ payments, total, totalPages, page, loading, onFilter, onPageChange, onChanged }) {
   const [filters, setFilters] = useState(BLANK);
   // id of the row whose PDF is being built, so only that row shows progress.
   const [pdfRowId, setPdfRowId] = useState(null);
+  // Row being confirmed / recorded by hand, if any.
+  const [actionRow, setActionRow] = useState(null);
 
   const downloadReceipt = async (payment) => {
     setPdfRowId(payment.id);
@@ -103,20 +106,20 @@ export default function PaymentsTable({ payments, total, totalPages, page, loadi
       />
 
       <div className="card overflow-x-auto p-0">
-        <table className="w-full text-sm min-w-[52rem]">
+        <table className="w-full text-sm min-w-[62rem]">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
-              {['Ref','Name','Category','Paid','Total Due','Balance','Method','Currency','Status','Date','Receipt'].map((h) => (
+              {['Ref','Name','Category','Paid','Total Due','Balance','Method','Currency','Status','Date','Proof','Action','Receipt'].map((h) => (
                 <th key={h} className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={11} className="py-8 text-center text-gray-400">Loading…</td></tr>
+              <tr><td colSpan={13} className="py-8 text-center text-gray-400">Loading…</td></tr>
             ) : payments.length === 0 ? (
               <tr>
-                <td colSpan={11} className="py-8 text-center text-gray-400">
+                <td colSpan={13} className="py-8 text-center text-gray-400">
                   {active ? 'No payments match these filters.' : 'No payments found.'}
                 </td>
               </tr>
@@ -152,6 +155,32 @@ export default function PaymentsTable({ payments, total, totalPages, page, loadi
                   {formatDate(p.activity_at || p.paid_at || p.created_at)}
                 </td>
                 <td className="py-3 px-4">
+                  {p.proof_url ? (
+                    <a
+                      href={assetUrl(p.proof_url)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-navy hover:text-gold text-xs font-semibold underline"
+                      title={p.proof_filename || 'Proof of payment'}
+                    >
+                      View
+                    </a>
+                  ) : (
+                    <span className="text-gray-300 text-xs" title="No proof of payment uploaded">—</span>
+                  )}
+                </td>
+                <td className="py-3 px-4">
+                  {/* Bank transfers never reach Paynow, so confirming one here
+                      is what credits it and adds it to revenue. */}
+                  <button
+                    className="text-xs font-semibold underline whitespace-nowrap"
+                    style={{ color: p.status === 'paid' ? '#6b7280' : 'var(--color-navy)' }}
+                    onClick={() => setActionRow(p)}
+                  >
+                    {p.status === 'paid' ? 'Edit' : 'Confirm'}
+                  </button>
+                </td>
+                <td className="py-3 px-4">
                   {p.id ? (
                     <button
                       className="text-navy hover:text-gold text-xs font-semibold underline disabled:opacity-50"
@@ -169,6 +198,14 @@ export default function PaymentsTable({ payments, total, totalPages, page, loadi
           </tbody>
         </table>
       </div>
+
+      {actionRow && (
+        <PaymentActionModal
+          row={actionRow}
+          onClose={() => setActionRow(null)}
+          onSaved={() => onChanged?.()}
+        />
+      )}
 
       {/* Pagination */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-sm text-gray-600">

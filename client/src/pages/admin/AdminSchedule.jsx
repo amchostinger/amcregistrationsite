@@ -6,16 +6,10 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import api from '../../lib/api';
+import { CONFERENCE_DAYS } from '../../lib/conferenceDays';
 
-const DAYS = [
-  { iso: '2027-03-09', label: 'Mon 9 Mar' },
-  { iso: '2027-03-10', label: 'Tue 10 Mar' },
-  { iso: '2027-03-11', label: 'Wed 11 Mar' },
-  { iso: '2027-03-12', label: 'Thu 12 Mar' },
-  { iso: '2027-03-13', label: 'Fri 13 Mar' },
-  { iso: '2027-03-14', label: 'Sat 14 Mar' },
-  { iso: '2027-03-15', label: 'Sun 15 Mar' },
-];
+// The same six days the public schedule renders — see lib/conferenceDays.js.
+const DAYS = CONFERENCE_DAYS;
 
 const TYPES = ['worship', 'keynote', 'general', 'social', 'break', 'logistics'];
 
@@ -68,6 +62,9 @@ export default function AdminSchedule() {
   const openEdit = (s) => {
     setForm({
       ...s,
+      // The API returns the day as `date`; without carrying it across, saving an
+      // edit sent no session_date at all and the session lost its day.
+      session_date: s.session_date || s.date || activeDay,
       start_time: s.time || '',
       end_time: s.end || '',
     });
@@ -130,6 +127,15 @@ export default function AdminSchedule() {
             {d.label}
           </button>
         ))}
+      </div>
+
+      {/* Same heading the public page prints for this day, so the editor and the
+          site are visibly describing the same programme. */}
+      <div className="mb-5">
+        <p style={{ fontFamily: 'Cinzel, serif', color: 'var(--color-navy)' }} className="text-sm font-bold uppercase tracking-wider">
+          {DAYS.find((d) => d.iso === activeDay)?.title || ''}
+        </p>
+        <p className="font-body text-xs text-gray-400">{activeDay}</p>
       </div>
 
       {loadError && (

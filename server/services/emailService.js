@@ -8,6 +8,8 @@
  * pointed there too — the sending domain is transactional-only.
  */
 
+const { officeLabel } = require('./registrationService');
+
 const FROM = process.env.RESEND_FROM_EMAIL || 'AMC 2027 Conference <conference@amcconference2027.org>';
 const ADMIN_EMAIL = process.env.ADMIN_NOTIFICATION_EMAIL || 'communications@africamethodistcouncil.org';
 const ARCHIVE_EMAIL = process.env.EMAIL_ARCHIVE_ADDRESS || 'communications@africamethodistcouncil.org';
@@ -227,7 +229,7 @@ async function sendRegistrationConfirmation(registrant) {
       ${tableRow('Full Name', fullName)}
       ${tableRow('Email', registrant.email)}
       ${tableRow('Category', registrant.category)}
-      ${tableRow('Office', registrant.office)}
+      ${tableRow('Office', officeLabel(registrant))}
       ${tableRow('Church', registrant.church)}
       ${tableRow('Country', registrant.country)}
       ${tableRow('Delegation size', registrant.num_people)}
@@ -369,7 +371,7 @@ async function sendAdminNewRegistrationNotification(registrant) {
       ${tableRow('Email', registrant.email)}
       ${tableRow('Phone', registrant.phone)}
       ${tableRow('Category', registrant.category)}
-      ${tableRow('Office', registrant.office)}
+      ${tableRow('Office', officeLabel(registrant))}
       ${tableRow('Church', registrant.church)}
       ${tableRow('Country', registrant.country)}
       ${tableRow('Accommodation', registrant.accommodation ? 'Yes' : 'No')}
@@ -421,12 +423,86 @@ async function sendAdminPaymentNotification(registrant, payment) {
   });
 }
 
+/**
+ * A delegate uploaded proof of a bank transfer. Nothing is credited by that
+ * upload — an admin has to look at the slip and confirm it — so the desk needs
+ * telling, or the money sits unreconciled and the delegate stays 'pending'.
+ *
+ * @param {object} registrant
+ * @param {object} payment — must carry proof_url
+ */
+async function sendAdminProofUploadedNotification(registrant, payment) {
+  const fullName = fullNameOf(registrant);
+  const proofLink = payment.proof_url
+    ? `${(process.env.SERVER_URL || '').replace(/\/$/, '')}${payment.proof_url}`
+    : '';
+
+  const html = wrapEmail('Proof of Payment Uploaded', `
+    <h2 style="color:#1e3a5f;margin:0 0 16px;">Proof of Payment Uploaded</h2>
+    ${noticeBox(
+      'Awaiting confirmation',
+      'A delegate has uploaded proof of a bank transfer. Check it against the bank statement, then confirm the payment on the dashboard to credit it.',
+      '#c9a84c'
+    )}
+    <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:24px 0;">
+      ${tableRow('Reference', registrant.registration_ref)}
+      ${tableRow('Name', fullName)}
+      ${tableRow('Email', registrant.email)}
+      ${tableRow('Amount claimed', money(payment.amount))}
+      ${tableRow('Outstanding balance', money(balanceOf(registrant)))}
+      ${proofLink ? tableRow('Proof', `<a href="${proofLink}" style="color:#1e3a5f;">Open uploaded file</a>`) : ''}
+    </table>
+    <p style="color:#555;font-size:13px;">Confirm or reject it on the <a href="${process.env.CLIENT_URL}/admin/payments" style="color:#1e3a5f;">payments dashboard</a>.</p>
+  `);
+
+  return send({
+    to: ADMIN_EMAIL,
+    archive: false, // already addressed to the desk
+    subject: `[AMC Admin] Proof of payment uploaded: ${fullName} – ${registrant.registration_ref}`,
+    html,
+  });
+}
+
+/**
+ * A Paynow callback arrived quoting a reference we hold no payment row for. When
+ * it reports a completed payment, money has moved with nothing to credit it
+ * against — a console warning is not enough, so put it in front of the desk.
+ *
+ * @param {object} params — Raw Paynow IPN body
+ */
+async function sendUnmatchedPaymentAlert(params) {
+  const html = wrapEmail('Unmatched Payment Callback', `
+    <h2 style="color:#b00020;margin:0 0 16px;">Unmatched Payment Callback</h2>
+    ${noticeBox(
+      'Action required',
+      'Paynow reported a <strong>paid</strong> transaction that matches no payment record in the system. Funds may have been collected without being credited to a registration. Please reconcile this by hand.',
+      '#b00020'
+    )}
+    <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:24px 0;">
+      ${tableRow('Merchant reference', params.reference || '—')}
+      ${tableRow('Paynow reference', params.paynowreference || '—')}
+      ${tableRow('Amount', params.amount || '—')}
+      ${tableRow('Status', params.status || '—')}
+    </table>
+    <p style="color:#555;font-size:13px;">Cross-check the <a href="${process.env.CLIENT_URL}/admin/payments" style="color:#1e3a5f;">payments dashboard</a> against the Paynow merchant portal.</p>
+  `);
+
+  return send({
+    to: ADMIN_EMAIL,
+    archive: false, // already addressed to the desk
+    subject: `[AMC Admin] UNMATCHED paid callback – ${params.reference || 'unknown reference'}`,
+    html,
+  });
+}
+
 module.exports = {
   sendRegistrationConfirmation,
   sendPaymentConfirmation,
   sendPaymentReminder,
   sendAdminNewRegistrationNotification,
   sendAdminPaymentNotification,
+  sendAdminProofUploadedNotification,
+  sendUnmatchedPaymentAlert,
   // exported for diagnostics / scripts
   config: { FROM, ADMIN_EMAIL, ARCHIVE_EMAIL, REPLY_TO, live: HAS_REAL_KEY },
 };

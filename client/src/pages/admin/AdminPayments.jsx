@@ -51,7 +51,9 @@ export default function AdminPayments() {
       <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
         <div>
           <h2 className="font-heading text-xl sm:text-2xl font-bold text-navy">Payments</h2>
-          <p className="text-gray-500 text-sm">{total} payment records</p>
+          <p className="text-gray-500 text-sm">
+            {total} payment records · bank transfers are confirmed here by hand
+          </p>
         </div>
         <button
           onClick={handleExportPdf}
@@ -70,6 +72,9 @@ export default function AdminPayments() {
         loading={loading}
         onFilter={handleFilter}
         onPageChange={handlePageChange}
+        // Confirming a bank transfer changes the row, the balance and the
+        // revenue total, so re-read the page the admin is looking at.
+        onChanged={() => load({ ...filters, page })}
       />
     </div>
   );

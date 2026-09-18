@@ -1,6 +1,8 @@
 /**
  * routes/uploads.js
  * POST /api/uploads/speaker-photo — admin-only image upload (multipart/form-data)
+ * POST /api/uploads/resource-file — admin-only document upload
+ * POST /api/uploads/payment-proof — admin-only proof-of-payment upload
  *
  * Files are written to <server>/uploads/speakers and served statically at
  * /uploads/speakers/<filename> (see app.js).
@@ -12,6 +14,7 @@ const crypto = require('crypto');
 const express = require('express');
 const multer = require('multer');
 const requireAuth = require('../middleware/clerkAuth');
+const { receiveProof, proofUrl } = require('../middleware/proofUpload');
 
 const router = express.Router();
 
@@ -118,6 +121,25 @@ router.post('/resource-file', requireAuth, (req, res) => {
       size: req.file.size,
       name: req.file.originalname,
     });
+  });
+});
+
+// ─── Proof of payment (admin side) ────────────────────────────────────────────
+
+/**
+ * An admin attaching a bank slip that reached the desk by email or by hand,
+ * rather than through the delegate's own upload. The file is stored the same
+ * way; the returned URL is passed to POST/PATCH /api/admin/payments to attach
+ * it to a payment record.
+ */
+router.post('/payment-proof', requireAuth, receiveProof, (req, res) => {
+  if (req.proofError) return res.status(400).json({ error: req.proofError });
+  if (!req.file) return res.status(400).json({ error: 'No file received.' });
+
+  res.status(201).json({
+    url: proofUrl(req.file.filename),
+    name: req.file.originalname,
+    size: req.file.size,
   });
 });
 

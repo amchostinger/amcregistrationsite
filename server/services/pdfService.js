@@ -13,6 +13,8 @@ const fs = require('fs');
 const path = require('path');
 const PDFDocument = require('pdfkit');
 
+const { officeLabel } = require('./registrationService');
+
 const NAVY = '#1e3a5f';
 const GOLD = '#c9a84c';
 const PARCHMENT = '#f8f6f0';
@@ -355,7 +357,7 @@ function registrationBody(doc, registrant, payments = []) {
     ['Email', registrant.email],
     ['Phone', registrant.phone],
     ['Category', registrant.category],
-    ['Office', registrant.office],
+    ['Office', officeLabel(registrant)],
     ['Church', registrant.church],
     ['Country', registrant.country],
     ['Delegation Size', registrant.num_people],
@@ -399,7 +401,7 @@ function registrationBody(doc, registrant, payments = []) {
         ['Email', delegate.email],
         ['Phone', delegate.phone],
         ['Category', delegate.category],
-        ['Office', delegate.office],
+        ['Office', officeLabel(delegate)],
         ['Church', delegate.church],
         ['Country', delegate.country],
       ]);

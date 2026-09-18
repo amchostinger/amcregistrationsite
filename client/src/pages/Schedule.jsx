@@ -1,15 +1,10 @@
 ﻿import { useState, useEffect, useMemo } from "react";
 import { Mic2, MapPin, Radio, Shirt, Clock3 } from "lucide-react";
 import api from "../lib/api";
+import { CONFERENCE_DAYS } from "../lib/conferenceDays";
 
-const DAYS = [
-  { iso: "2027-03-09", label: "Tue 9 Mar",  title: "Arrival & Opening",          dressCode: null },
-  { iso: "2027-03-10", label: "Wed 10 Mar", title: "Business Day I",             dressCode: null },
-  { iso: "2027-03-11", label: "Thu 11 Mar", title: "Women's Day",                dressCode: "All delegates wear BLACK" },
-  { iso: "2027-03-12", label: "Fri 12 Mar", title: "Celebration of Diversity",   dressCode: "Wear church material/logo" },
-  { iso: "2027-03-13", label: "Sat 13 Mar", title: "African Culture Celebration",dressCode: "Wear traditional attire of your country. Excursion after lunch" },
-  { iso: "2027-03-14", label: "Sun 14 Mar", title: "Church Services",            dressCode: "Wear church uniforms. Services around Harare" },
-];
+// Shared with the admin editor so both pages agree on which days exist.
+const DAYS = CONFERENCE_DAYS;
 
 const TYPE_META = {
   worship:   { label: "Worship",   dot: "#3b82f6", bg: "#eff6ff", border: "#bfdbfe", text: "#1e40af" },

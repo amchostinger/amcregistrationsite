@@ -1,7 +1,8 @@
 /**
  * routes/payments.js
- * POST /api/payments/initiate       — Start a Paynow payment
+ * POST /api/payments/initiate        — Start a Paynow payment
  * GET  /api/payments/poll/:paymentId — Poll payment status
+ * POST /api/payments/proof           — Upload proof of a bank transfer
  * POST /api/payments/paynow-result   — Paynow webhook (IPN)
  */
 
@@ -12,6 +13,7 @@ const { query } = require('../config/db');
 const paynowService = require('../services/paynowService');
 const emailService = require('../services/emailService');
 const { recalculateRegistrantTotals } = require('../services/registrationService');
+const { receiveProof, proofUrl } = require('../middleware/proofUpload');
 
 const router = express.Router();
 
@@ -218,6 +220,99 @@ router.get('/poll/:paymentId', async (req, res, next) => {
   }
 });
 
+// ─── POST /api/payments/proof ────────────────────────────────────────────────
+
+/**
+ * Proof of payment for a bank transfer.
+ *
+ * Paynow cannot collect a direct bank transfer, so those are settled by hand:
+ * the delegate uploads the slip here and an admin confirms it on the dashboard.
+ * Uploading changes no money — the payment stays 'pending' until a human says
+ * otherwise — so this route needs no login, only the registration reference,
+ * which is the same secret the delegate uses to look their registration up.
+ *
+ * multipart/form-data: proof=<file>, ref=<registration_ref>, paymentId=<id?>
+ */
+router.post('/proof', receiveProof, async (req, res, next) => {
+  try {
+    if (req.proofError) return res.status(400).json({ error: req.proofError });
+    if (!req.file) return res.status(400).json({ error: 'No file received.' });
+
+    const ref = String(req.body.ref || '').trim();
+    if (!ref) return res.status(400).json({ error: 'Registration reference is required.' });
+
+    const [regRows] = await query(
+      'SELECT id, registration_ref, balance_due, grand_total FROM registrants WHERE registration_ref = ?',
+      [ref]
+    );
+    if (!regRows.length) return res.status(404).json({ error: 'Registration not found.' });
+    const registrant = regRows[0];
+
+    const url = proofUrl(req.file.filename);
+    const originalName = String(req.file.originalname || '').slice(0, 255);
+
+    // Attach to the payment the delegate came from where we know it, otherwise
+    // to their newest unsettled attempt. A reference alone must never be enough
+    // to touch a payment belonging to somebody else, so the registrant is part
+    // of every lookup.
+    const requestedId = parseInt(req.body.paymentId, 10);
+    let payment = null;
+
+    if (Number.isInteger(requestedId) && requestedId > 0) {
+      const [rows] = await query(
+        'SELECT * FROM payments WHERE id = ? AND registrant_id = ?',
+        [requestedId, registrant.id]
+      );
+      payment = rows[0] || null;
+    }
+
+    if (!payment) {
+      const [rows] = await query(
+        `SELECT * FROM payments WHERE registrant_id = ? AND status <> 'paid'
+         ORDER BY created_at DESC LIMIT 1`,
+        [registrant.id]
+      );
+      payment = rows[0] || null;
+    }
+
+    if (payment && payment.status === 'paid') {
+      return res.status(409).json({ error: 'This payment has already been confirmed.' });
+    }
+
+    // Someone who emailed their slip before ever choosing a payment method has
+    // no row to hang it on; record the transfer they are evidencing.
+    if (!payment) {
+      const amount = Math.max(0, Number(registrant.balance_due ?? registrant.grand_total ?? 0));
+      const reference = `${registrant.registration_ref}-${Date.now()}`;
+      const [result] = await query(
+        `INSERT INTO payments (registrant_id, paynow_reference, amount, currency, payment_method, status,
+                               proof_url, proof_filename, proof_uploaded_at)
+         VALUES (?, ?, ?, 'USD', 'bank', 'pending', ?, ?, NOW())`,
+        [registrant.id, reference, amount, url, originalName]
+      );
+      payment = { id: result.insertId, amount };
+    } else {
+      await query(
+        `UPDATE payments SET proof_url = ?, proof_filename = ?, proof_uploaded_at = NOW() WHERE id = ?`,
+        [url, originalName, payment.id]
+      );
+    }
+
+    emailService
+      .sendAdminProofUploadedNotification(registrant, { ...payment, proof_url: url })
+      .catch((err) => console.error('[Email Error]', err.message));
+
+    return res.status(201).json({
+      success: true,
+      paymentId: payment.id,
+      proofUrl: url,
+      message: 'Proof of payment received. Your registration will be confirmed once it has been checked.',
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // ─── POST /api/payments/paynow-result (Webhook / IPN) ────────────────────────
 
 router.post('/paynow-result', express.urlencoded({ extended: false }), async (req, res, next) => {
@@ -241,7 +336,23 @@ router.post('/paynow-result', express.urlencoded({ extended: false }), async (re
     );
 
     if (!payRows.length) {
-      console.warn('[Paynow IPN] Payment record not found for ref:', paynowRef);
+      // Two very different situations share this branch. A callback for a
+      // reference we never held (rows cleared during testing, say) is noise. A
+      // *paid* callback with nothing to credit means money moved and no record
+      // exists — that has to reach a person, not just the log.
+      if (isPaid) {
+        console.error('[Paynow IPN] CRITICAL: paid callback with no matching payment record', {
+          reference: paynowRef,
+          paynowreference: params.paynowreference,
+          amount: params.amount,
+          status: params.status,
+        });
+        emailService
+          .sendUnmatchedPaymentAlert(params)
+          .catch((err) => console.error('[Email Error]', err.message));
+      } else {
+        console.warn(`[Paynow IPN] No payment record for ref (status ${rawStatus}):`, paynowRef);
+      }
       return res.status(200).send('OK'); // Acknowledge to prevent retries
     }
 

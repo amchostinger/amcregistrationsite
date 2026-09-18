@@ -3,10 +3,10 @@
  * Wrapper around the official Paynow NodeJS SDK.
  * Docs: https://github.com/paynow/Paynow-NodeJS-SDK
  * 
- * IMPORTANT: Test Mode Phone Numbers
- * When using Paynow in TEST MODE (Integration ID 25178), EcoCash transactions require:
- * - Test case phone numbers like: 0777000000, 0781234567, etc.
- * - Real phone numbers will be rejected with error about test case numbers
+ * NOTE: Integration ID 25178 is Africa Methodist Council's own LIVE id, issued
+ * by Paynow for the "AMC 2027 Conference" payment link. It was previously
+ * hardcoded below as a test id, which made all production traffic report
+ * itself as test mode. Test mode is now driven by the environment alone.
  */
 
 const { Paynow } = require('paynow');
@@ -54,13 +54,26 @@ function withTimeout(promise, ms = 15000, message = 'Paynow gateway request time
 }
 
 /**
+ * Reduce an address to its bare form. Paynow embeds authemail directly in the
+ * checkout URL path, so an RFC-5322 display-name form ("Name <addr@host>")
+ * puts spaces and angle brackets into that path — their routing throws a 500
+ * and the delegate lands on "Paynow has generated an error and cannot continue".
+ *
+ * @param {string} value - Address, possibly wrapped with a display name
+ * @returns {string} Bare address
+ */
+function extractEmailAddress(value) {
+  if (!value) return '';
+  const match = String(value).match(/<([^>]+)>/);
+  return (match ? match[1] : String(value)).trim();
+}
+
+/**
  * Check if we're in test mode based on integration ID
  * @returns {boolean}
  */
 function isTestMode() {
-  const id = process.env.PAYNOW_INTEGRATION_ID;
-  // ID 25178 is Paynow's test integration ID
-  return id === '25178' || id === 'test' || process.env.NODE_ENV === 'test';
+  return process.env.PAYNOW_INTEGRATION_ID === 'test' || process.env.NODE_ENV === 'test';
 }
 
 /**
@@ -138,7 +151,9 @@ async function initiatePayment({ registrant, amount, currency, paymentMethod, ph
 
   // In test mode, Paynow requires the merchant email, not the registrant email
   // The merchant email is the one registered with Paynow
-  const merchantEmail = process.env.PAYNOW_MERCHANT_EMAIL || process.env.RESEND_FROM_EMAIL || 'conference@africamethodistcouncil.org';
+  const merchantEmail = extractEmailAddress(
+    process.env.PAYNOW_MERCHANT_EMAIL || process.env.RESEND_FROM_EMAIL || 'conference@africamethodistcouncil.org'
+  );
 
   console.log('[Paynow] Test Mode:', isTestMode());
   console.log('[Paynow] Using merchant email:', merchantEmail);

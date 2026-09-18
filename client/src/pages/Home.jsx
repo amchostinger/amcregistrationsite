@@ -8,7 +8,7 @@ const HERO_IMAGE = "https://images.unsplash.com/photo-1540575467063-178a50c2df87
 const QUICK_LINKS = [
   { to: "/schedule", Icon: Calendar,  title: "Full Schedule",  desc: "Browse all sessions, speakers & events across 6 days." },
   { to: "/speakers", Icon: Mic2,      title: "Speakers",       desc: "Meet the bishops, theologians and scholars presenting." },
-  { to: "/hotels",   Icon: Hotel,     title: "Hotel Packages", desc: "Reserve your accommodation at partner hotels." },
+  { to: "/hotels",   Icon: Hotel,     title: "Hotel Packages", desc: "Browse partner hotels and book directly with them." },
   { to: "/register", Icon: PenLine,   title: "Register Now",   desc: "Secure your delegate, observer, or guest place today." },
 ];
 const STATS = [

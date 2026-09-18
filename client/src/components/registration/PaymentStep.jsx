@@ -82,8 +82,11 @@ export default function PaymentStep({ formData, registrationRef, onInitiate, onB
     try {
       const result = await onInitiate({ paymentMethod: method, mobilePhone });
       if (method === 'bank') {
-        // No redirect — delegate pays manually; go to status page to show instructions
-        navigate(`/payment-status?ref=${registrationRef}&method=bank`);
+        // No redirect — delegate pays manually; go to the status page for the
+        // bank details and the proof-of-payment upload. The payment id goes
+        // with them so the slip attaches to this attempt.
+        const paymentParam = result?.paymentId ? `&paymentId=${result.paymentId}` : '';
+        navigate(`/payment-status?ref=${registrationRef}&method=bank${paymentParam}`);
         return;
       }
       if (result?.paymentId && !result?.redirectUrl) {
@@ -215,11 +218,11 @@ export default function PaymentStep({ formData, registrationRef, onInitiate, onB
             ))}
           </dl>
           <p className="font-body text-xs pt-2 border-t" style={{ borderColor: '#e5e7eb', color: 'var(--color-muted)' }}>
-            After payment, email your proof of payment to{' '}
+            After paying, upload your proof of payment on the next screen &mdash; or email it to{' '}
             <a href="mailto:conference@africamethodistcouncil.org" className="underline break-words" style={{ color: 'var(--color-navy)' }}>
               conference@africamethodistcouncil.org
             </a>{' '}
-            with your registration reference in the subject line. Your registration will be confirmed within 24 hours.
+            with your registration reference in the subject line. Your registration is confirmed once the transfer has been checked.
           </p>
         </div>
       )}

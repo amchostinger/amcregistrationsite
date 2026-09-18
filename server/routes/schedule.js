@@ -15,6 +15,26 @@ function toHHMM(t) {
   return String(t).slice(0, 5);
 }
 
+/**
+ * The day a session belongs to, as YYYY-MM-DD.
+ *
+ * mysql2 hands back a DATE column as a JS Date at local midnight, which
+ * JSON.stringify then renders in UTC — in Harare (+02:00) that is 22:00 the
+ * evening *before*, so every session came back dated a day early. Format it
+ * from the local parts instead, so the day the admin picked is the day the
+ * public page files it under.
+ */
+function toISODate(value) {
+  if (!value) return null;
+  if (value instanceof Date) {
+    const yyyy = value.getFullYear();
+    const mm = String(value.getMonth() + 1).padStart(2, '0');
+    const dd = String(value.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  }
+  return String(value).slice(0, 10);
+}
+
 function formatSession(row) {
   let speakers = [];
   try {
@@ -28,6 +48,9 @@ function formatSession(row) {
   
   return {
     id:         row.id,
+    // Sent back so an edit round-trips onto the same day it was loaded from.
+    date:       toISODate(row.session_date),
+    session_date: toISODate(row.session_date),
     time:       toHHMM(row.start_time),
     end:        toHHMM(row.end_time),
     title:      row.title,
