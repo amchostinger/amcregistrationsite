@@ -5,17 +5,31 @@
  */
 
 const express = require('express');
+const rateLimit = require('express-rate-limit');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { query } = require('../config/db');
 const requireAuth = require('../middleware/clerkAuth');
 
 const router = express.Router();
-const JWT_SECRET = process.env.JWT_SECRET || 'changeme-use-a-long-random-secret-in-production';
-const JWT_EXPIRES = '12h';
+const { JWT_SECRET, JWT_EXPIRES } = require('../config/jwt');
+
+// A handful of admin accounts guarded by passwords is exactly the shape an
+// online brute-force succeeds against, so cap attempts per IP. Counted per
+// IP+email so one attacker cannot lock every admin out by burning the quota
+// against a single address, and successful logins are not counted.
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  skipSuccessfulRequests: true,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `${req.ip}|${String(req.body?.email || '').toLowerCase()}`,
+  message: { error: 'Too many sign-in attempts. Please try again in 15 minutes.' },
+});
 
 // POST /api/auth/login
-router.post('/login', async (req, res, next) => {
+router.post('/login', loginLimiter, async (req, res, next) => {
   try {
     const { email, password } = req.body;
     if (!email || !password) {

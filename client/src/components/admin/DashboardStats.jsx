@@ -3,6 +3,7 @@
  * Stats cards + charts for the admin dashboard.
  */
 
+import { Link } from 'react-router-dom';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { formatCurrency, getStatusBadgeClass } from '../../lib/utils';
 
@@ -33,10 +34,28 @@ export default function DashboardStats({ stats }) {
       {/* Stat Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard label="Total Registrations" value={stats.totalRegistrations} />
-        <StatCard label="Confirmed (Paid)" value={stats.confirmedCount} sub="Fully confirmed" />
+        <StatCard label="Confirmed (Paid)" value={stats.confirmedCount} sub="Payment received" />
         <StatCard label="Pending Payment" value={stats.pendingCount} sub="Awaiting payment" />
         <StatCard label="Total Revenue" value={formatCurrency(stats.totalRevenue)} accent />
       </div>
+
+      {/* Bank transfers cannot go through Paynow, so they sit here until an
+          admin checks the slip and confirms them on the payments page. */}
+      {stats.awaitingConfirmation > 0 && (
+        <Link
+          to="/admin/payments"
+          className="card block hover:shadow-md transition-shadow"
+          style={{ borderLeft: '4px solid var(--color-gold)' }}
+        >
+          <p className="text-sm font-semibold text-navy">
+            {stats.awaitingConfirmation} bank transfer{stats.awaitingConfirmation === 1 ? '' : 's'} awaiting confirmation
+            <span className="text-gray-500 font-normal"> · {formatCurrency(stats.awaitingAmount)} not yet counted as revenue</span>
+          </p>
+          <p className="text-xs text-gray-400 mt-1">
+            Proof of payment uploaded — check it against the bank statement, then confirm it on the payments page.
+          </p>
+        </Link>
+      )}
 
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

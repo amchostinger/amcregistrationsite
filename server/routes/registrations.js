@@ -42,6 +42,11 @@ const registrationValidation = [
   body('email').trim().isEmail().normalizeEmail().withMessage('Valid email is required'),
   body('phone').optional().trim().isLength({ max: 30 }),
   body('office').isIn(OFFICES).withMessage('Invalid office'),
+  // 'Other' is a bucket, not a job title — the registrant has to say which role.
+  body('office_other')
+    .if(body('office').equals('Other'))
+    .trim().notEmpty().withMessage('Please type your office / role')
+    .isLength({ max: 150 }).withMessage('Office / role must be 150 characters or fewer'),
   body('category').isIn(['Delegate','Invited Guest','Observer']).withMessage('Invalid category'),
   body('church').optional().trim().isLength({ max: 255 }),
   body('country').trim().notEmpty().isLength({ max: 100 }).withMessage('Country is required'),
@@ -88,6 +93,21 @@ const registrationValidation = [
   body('delegate_details.*.office')
     .if(body('delegate_details').exists())
     .trim().notEmpty().withMessage('Delegate office is required'),
+  body('delegate_details.*.office_other')
+    .if(body('delegate_details').exists())
+    .optional().trim().isLength({ max: 150 }).withMessage('Delegate office / role must be 150 characters or fewer'),
+  // Same rule as the lead registrant: picking 'Other' means typing the role.
+  body('delegate_details')
+    .optional()
+    .custom((value) => {
+      if (!Array.isArray(value)) return true;
+      value.forEach((delegate, i) => {
+        if (delegate?.office === 'Other' && !String(delegate?.office_other || '').trim()) {
+          throw new Error(`Please type the office / role for delegate ${i + 2}`);
+        }
+      });
+      return true;
+    }),
   body('delegate_details.*.church')
     .if(body('delegate_details').exists())
     .optional().trim().isLength({ max: 255 }).withMessage('Delegate church must be 255 characters or fewer'),
@@ -144,12 +164,34 @@ router.post('/', registrationLimiter, registrationValidation, async (req, res, n
 
 // ─── GET /api/registrations/:ref ─────────────────────────────────────────────
 
-router.get('/:ref', async (req, res, next) => {
+// Sequential references are trivially enumerable, so cap how fast one IP can
+// walk them. A genuine registrant follows this link a handful of times; a
+// scraper needs thousands of requests to sweep the range.
+const lookupLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many lookups. Please try again shortly.' },
+});
+
+router.get('/:ref', lookupLimiter, async (req, res, next) => {
   try {
     const ref = req.params.ref.toUpperCase().trim();
 
+    // Never SELECT * here. This endpoint is public by design — the payment
+    // return page and the "check your registration" link in our emails both
+    // reach it with nothing but a reference — and references are sequential,
+    // so anyone can walk AMC2027-00001 upwards. Returning the whole row handed
+    // out every delegate's private email, phone, dietary notes and the full
+    // contact details of every additional delegate in delegate_details.
+    // Only fields a registrant already knows about themselves go out.
     const [rows] = await query(
-      `SELECT *
+      `SELECT registration_ref, designation, first_name, last_name,
+              category, country, church, num_people,
+              conference_total, grand_total, amount_paid, balance_due,
+              payment_status, registration_status,
+              hotel_name, hotel_room_type, created_at
        FROM registrants WHERE registration_ref = ?`,
       [ref]
     );

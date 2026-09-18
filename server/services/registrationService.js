@@ -5,14 +5,42 @@
 
 const { query } = require('../config/db');
 
+const REF_PREFIX = 'AMC2027-';
+const REF_PAD = 5;
+// MySQL's duplicate-key error. Two registrations that race past the same MAX()
+// collide here rather than silently sharing a reference.
+const ER_DUP_ENTRY = 'ER_DUP_ENTRY';
+const REF_MAX_ATTEMPTS = 8;
+
 /**
- * Generate a unique AMC2027-XXXXX reference number.
- * Uses COUNT(*) to derive the next sequence number.
+ * Generate the next AMC2027-XXXXX reference number.
+ *
+ * Derived from MAX(sequence), never COUNT(*). COUNT(*) shrinks whenever a
+ * registrant row is deleted, which walks the generator backwards onto
+ * references that are still in use — a deleted test record was enough to make
+ * every subsequent registration fail on the registration_ref unique key.
+ * MAX() only ever moves forward, so a deletion leaves a gap instead of a
+ * collision.
+ *
+ * Only well-formed AMC2027-<digits> references are considered, so a manually
+ * inserted reference in another format cannot perturb the sequence.
  */
+async function nextRefSequence() {
+  const [rows] = await query(
+    `SELECT MAX(CAST(SUBSTRING(registration_ref, ?) AS UNSIGNED)) AS max_seq
+       FROM registrants
+      WHERE registration_ref REGEXP '^AMC2027-[0-9]+$'`,
+    [REF_PREFIX.length + 1]
+  );
+  return Number(rows[0]?.max_seq || 0) + 1;
+}
+
+function formatRef(sequence) {
+  return `${REF_PREFIX}${String(sequence).padStart(REF_PAD, '0')}`;
+}
+
 async function generateRef() {
-  const [rows] = await query('SELECT COUNT(*) AS count FROM registrants');
-  const num = String(Number(rows[0].count) + 1).padStart(5, '0');
-  return `AMC2027-${num}`;
+  return formatRef(await nextRefSequence());
 }
 
 /**
@@ -41,6 +69,7 @@ function normalizeRegistrantData(data) {
     hotel_rooms: Number(data.hotel_rooms || 0),
     accommodation_nights: Number(data.accommodation_nights || 0),
     amount_paid: Number(data.amount_paid || 0),
+    office_other: typeof data.office_other === 'string' ? data.office_other.trim() : null,
     delegate_details: delegateDetails,
   };
 
@@ -139,18 +168,43 @@ async function getLiveFees() {
 }
 
 async function createRegistrant(data) {
-  const ref = await generateRef();
   const normalized = normalizeRegistrantData(data);
   const totals = await calculateRegistrantTotals(normalized);
 
+  // Two registrations submitted at the same instant can both read the same
+  // MAX(sequence) before either has inserted. The unique key on
+  // registration_ref is what actually arbitrates that race; this loop walks the
+  // loser onto the next free reference instead of surfacing a 500 to a delegate
+  // who did nothing wrong.
+  let sequence = await nextRefSequence();
+  let ref;
+
+  for (let attempt = 1; ; attempt += 1) {
+    ref = formatRef(sequence);
+    try {
+      await insertRegistrant(ref, normalized, totals);
+      break;
+    } catch (err) {
+      if (err.code !== ER_DUP_ENTRY || attempt >= REF_MAX_ATTEMPTS) throw err;
+      // Re-read rather than blindly incrementing: a burst of concurrent
+      // registrations may have moved the sequence on by more than one.
+      sequence = Math.max(sequence + 1, await nextRefSequence());
+    }
+  }
+
+  const [rows] = await query('SELECT * FROM registrants WHERE registration_ref = ?', [ref]);
+  return rows[0];
+}
+
+async function insertRegistrant(ref, normalized, totals) {
   await query(
     `INSERT INTO registrants
        (registration_ref, designation, first_name, last_name, email, phone,
-        office, category, church, country, accommodation, accommodation_nights,
+        office, office_other, category, church, country, accommodation, accommodation_nights,
         num_people, delegate_details, dietary_requirements, special_requests,
         hotel_id, hotel_booking_id, hotel_name, hotel_room_type, hotel_price_usd, hotel_rooms,
         conference_total, hotel_total, grand_total, amount_paid, balance_due)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       ref,
       normalized.designation,
@@ -159,6 +213,9 @@ async function createRegistrant(data) {
       normalized.email,
       normalized.phone || null,
       normalized.office,
+      // Only meaningful alongside office = 'Other'; blanked otherwise so a
+      // stale value can never outlive the choice that produced it.
+      normalized.office === 'Other' ? (normalized.office_other || null) : null,
       normalized.category,
       normalized.church || null,
       normalized.country || null,
@@ -181,9 +238,6 @@ async function createRegistrant(data) {
       totals.balanceDue,
     ]
   );
-
-  const [rows] = await query('SELECT * FROM registrants WHERE registration_ref = ?', [ref]);
-  return rows[0];
 }
 
 async function recalculateRegistrantTotals(registrant) {
@@ -214,4 +268,66 @@ async function recalculateRegistrantTotals(registrant) {
   return totals;
 }
 
-module.exports = { generateRef, calculateTotal, getLiveFees, createRegistrant, calculateRegistrantTotals, recalculateRegistrantTotals };
+
+/**
+ * Re-derive a registrant's money columns from the payments ledger.
+ *
+ * The Paynow paths add each settled payment onto amount_paid as it lands. That
+ * is fine going forward but cannot be undone, and a bank transfer confirmed by
+ * an admin can also be reverted (wrong slip, duplicate row, refund). Summing
+ * the 'paid' rows instead makes every admin action reversible and self-healing:
+ * whatever the ledger says is what the registrant owes.
+ *
+ * @param {number} registrantId
+ * @returns {Promise<{grandTotal:number, amountPaid:number, balanceDue:number, paymentStatus:string, registrationStatus:string}>}
+ */
+async function syncRegistrantFinancials(registrantId) {
+  const [regRows] = await query('SELECT * FROM registrants WHERE id = ?', [registrantId]);
+  if (!regRows.length) throw new Error('Registrant not found');
+  const registrant = regRows[0];
+
+  const [paidRows] = await query(
+    `SELECT COALESCE(SUM(amount), 0) AS paid FROM payments
+     WHERE registrant_id = ? AND status = 'paid'`,
+    [registrantId]
+  );
+
+  const grandTotal = Number(registrant.grand_total || 0);
+  const amountPaid = Number(paidRows[0].paid || 0);
+  const balanceDue = Math.max(0, grandTotal - amountPaid);
+  // Settled only when the whole fee is in. A part payment stays 'pending' so it
+  // keeps showing up on the outstanding list.
+  const settled = grandTotal > 0 && amountPaid >= grandTotal;
+
+  const paymentStatus = settled ? 'paid' : 'pending';
+  // A cancelled registration stays cancelled — money moving does not un-cancel it.
+  const registrationStatus = registrant.registration_status === 'cancelled'
+    ? 'cancelled'
+    : (settled ? 'confirmed' : 'pending');
+
+  await query(
+    `UPDATE registrants
+       SET amount_paid = ?, balance_due = ?, payment_status = ?, registration_status = ?
+     WHERE id = ?`,
+    [amountPaid, balanceDue, paymentStatus, registrationStatus, registrantId]
+  );
+
+  return { grandTotal, amountPaid, balanceDue, paymentStatus, registrationStatus };
+}
+
+/**
+ * What to print for someone's office/role.
+ *
+ * 'Other' is a bucket, not a job title — the title the registrant typed lives
+ * in office_other. Used by the admin dashboard, the PDFs and the emails so all
+ * three read the same.
+ */
+function officeLabel(person) {
+  if (!person) return '';
+  const office = person.office || '';
+  if (office !== 'Other') return office;
+  const typed = (person.office_other || '').trim();
+  return typed || 'Other';
+}
+
+module.exports = { generateRef, calculateTotal, getLiveFees, createRegistrant, calculateRegistrantTotals, recalculateRegistrantTotals, syncRegistrantFinancials, officeLabel };

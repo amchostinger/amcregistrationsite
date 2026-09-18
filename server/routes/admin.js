@@ -10,6 +10,8 @@ const { Parser } = require('json2csv');
 const { query, pool } = require('../config/db');
 const clerkAuth = require('../middleware/clerkAuth');
 const pdfService = require('../services/pdfService');
+const emailService = require('../services/emailService');
+const { syncRegistrantFinancials } = require('../services/registrationService');
 
 const router = express.Router();
 
@@ -42,9 +44,21 @@ router.get('/stats', async (req, res, next) => {
     const [totals] = await query(
       `SELECT
          COUNT(*) AS totalRegistrations,
-         SUM(registration_status = 'confirmed') AS confirmedCount,
+         SUM(registration_status = 'confirmed') AS adminConfirmedCount,
          SUM(registration_status = 'pending') AS pendingCount
        FROM registrants`
+    );
+
+    // The dashboard tile reads "Confirmed (Paid)", so it has to be counted off
+    // money received, not off registration_status. registration_status is a
+    // desk workflow flag an admin sets by hand and carries no payment meaning —
+    // counting it showed a delegate with a zero balance paid as "Paid" and put
+    // the tile in direct contradiction with the revenue figure beside it, which
+    // has always counted payments.status = 'paid'. Both now read the same source.
+    const [paidRegistrants] = await query(
+      `SELECT COUNT(DISTINCT p.registrant_id) AS paidCount
+       FROM payments p
+       WHERE p.status = 'paid'`
     );
 
     const [revenue] = await query(
@@ -57,6 +71,15 @@ router.get('/stats', async (req, res, next) => {
       `SELECT COALESCE(SUM(balance_due), 0) AS totalOutstanding,
               COALESCE(SUM(grand_total), 0) AS totalExpected
        FROM registrants`
+    );
+
+    // Bank transfers sitting with a slip attached but no confirmation yet —
+    // money the desk still has to check before it counts as revenue.
+    const [awaiting] = await query(
+      `SELECT COUNT(*) AS awaitingConfirmation,
+              COALESCE(SUM(amount), 0) AS awaitingAmount
+       FROM payments
+       WHERE status = 'pending' AND proof_url IS NOT NULL`
     );
 
     const [byCategory] = await query(
@@ -77,11 +100,19 @@ router.get('/stats', async (req, res, next) => {
 
     return res.json({
       totalRegistrations: Number(totals[0].totalRegistrations),
-      confirmedCount: Number(totals[0].confirmedCount),
-      pendingCount: Number(totals[0].pendingCount),
+      confirmedCount: Number(paidRegistrants[0].paidCount),
+      // Kept separate so the desk can still see how many registrations staff
+      // have marked confirmed, without that standing in for payment.
+      adminConfirmedCount: Number(totals[0].adminConfirmedCount),
+      // "Pending Payment" is the complement of the paid tile, off the same
+      // source, so the two always add up to the registration total.
+      pendingCount: Number(totals[0].totalRegistrations) - Number(paidRegistrants[0].paidCount),
+      adminPendingCount: Number(totals[0].pendingCount),
       totalRevenue: Number(revenue[0].totalRevenue),
       totalOutstanding: Number(outstanding[0].totalOutstanding),
       totalExpected: Number(outstanding[0].totalExpected),
+      awaitingConfirmation: Number(awaiting[0].awaitingConfirmation),
+      awaitingAmount: Number(awaiting[0].awaitingAmount),
       byCategory,
       byCountry,
       recentRegistrations: recent,
@@ -306,6 +337,7 @@ function paymentFilters(q) {
 const PAYMENT_COLUMNS = `
   p.id, p.registrant_id, p.paynow_reference, p.paynow_poll_url, p.paynow_status_raw,
   p.amount, p.currency, p.payment_method, p.paid_at, p.created_at,
+  p.proof_url, p.proof_filename, p.proof_uploaded_at, p.confirmed_by, p.confirmed_at, p.admin_note,
   ${DERIVED_STATUS} AS status,
   ${DERIVED_DATE} AS activity_at,
   (SELECT COUNT(*) FROM payments p3 WHERE p3.registrant_id = r.id) AS payment_attempts,
@@ -349,6 +381,190 @@ router.get('/payments', async (req, res, next) => {
   }
 });
 
+// ─── Manual (off-gateway) payments ────────────────────────────────────────────
+
+/**
+ * Paynow cannot collect a direct bank transfer, so those payments never reach
+ * the gateway at all: the delegate pays into the account, uploads their slip,
+ * and an admin confirms it here. Confirming is what puts the money into the
+ * revenue figures, which count payments with status 'paid'.
+ *
+ * Both routes below re-derive the registrant's totals from the payments ledger
+ * rather than adding to them, so a confirmation made in error can be taken back
+ * by setting the row to any non-paid status.
+ */
+
+/** Statuses an admin may set by hand. Gateway-only values are not in the list. */
+const MANUAL_STATUSES = ['pending', 'paid', 'failed', 'cancelled', 'refunded'];
+const MANUAL_METHODS = ['bank', 'ecocash', 'telecash', 'visa', 'mastercard', 'paynow'];
+
+/**
+ * Tell the delegate and the desk that a payment landed — same pair of messages
+ * the Paynow flows send, so a bank transfer is confirmed exactly like a card
+ * payment from the delegate's point of view. Failure to send must not fail the
+ * confirmation: the money is already recorded.
+ */
+function notifyPaymentConfirmed(registrantId, paymentId) {
+  return (async () => {
+    const [[registrant]] = await query('SELECT * FROM registrants WHERE id = ?', [registrantId]);
+    const [[payment]] = await query('SELECT * FROM payments WHERE id = ?', [paymentId]);
+    if (!registrant || !payment) return;
+    await Promise.all([
+      emailService.sendPaymentConfirmation(registrant, payment),
+      emailService.sendAdminPaymentNotification(registrant, payment),
+    ]);
+  })().catch((err) => console.error('[Email Error]', err.message));
+}
+
+// ─── POST /api/admin/payments — record a payment taken outside Paynow ─────────
+
+router.post('/payments', async (req, res, next) => {
+  try {
+    const registrantId = parseInt(req.body.registrant_id, 10);
+    if (!Number.isInteger(registrantId) || registrantId < 1) {
+      return res.status(400).json({ error: 'A valid registrant_id is required.' });
+    }
+
+    const [regRows] = await query('SELECT * FROM registrants WHERE id = ?', [registrantId]);
+    if (!regRows.length) return res.status(404).json({ error: 'Registrant not found.' });
+    const registrant = regRows[0];
+
+    const amount = Number(req.body.amount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return res.status(400).json({ error: 'Enter an amount greater than zero.' });
+    }
+
+    const status = MANUAL_STATUSES.includes(req.body.status) ? req.body.status : 'paid';
+    const method = MANUAL_METHODS.includes(req.body.payment_method) ? req.body.payment_method : 'bank';
+    const currency = req.body.currency === 'ZWL' ? 'ZWL' : 'USD';
+    const note = req.body.admin_note ? String(req.body.admin_note).slice(0, 500) : null;
+    const proof = req.body.proof_url ? String(req.body.proof_url).slice(0, 500) : null;
+    const admin = adminRef(req);
+
+    // The gateway reference column doubles as the human reference for a manual
+    // payment, so a bank slip number can be searched for like any other.
+    const reference = String(req.body.reference || `${registrant.registration_ref}-MANUAL-${Date.now()}`).slice(0, 100);
+
+    const [result] = await query(
+      `INSERT INTO payments
+         (registrant_id, paynow_reference, amount, currency, payment_method, status,
+          paid_at, proof_url, proof_uploaded_at, confirmed_by, confirmed_at, admin_note)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        registrantId,
+        reference,
+        amount,
+        currency,
+        method,
+        status,
+        status === 'paid' ? new Date() : null,
+        proof,
+        proof ? new Date() : null,
+        status === 'paid' ? admin : null,
+        status === 'paid' ? new Date() : null,
+        note,
+      ]
+    );
+
+    const totals = await syncRegistrantFinancials(registrantId);
+
+    await auditLog(
+      admin, 'PAYMENT_RECORDED', 'payments', result.insertId,
+      `${currency} ${amount.toFixed(2)} via ${method} for ${registrant.registration_ref} (${status})`
+    );
+
+    if (status === 'paid') notifyPaymentConfirmed(registrantId, result.insertId);
+
+    return res.status(201).json({ id: result.insertId, status, ...totals });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ─── PATCH /api/admin/payments/:id — confirm, revert or amend a payment ───────
+
+router.patch('/payments/:id', async (req, res, next) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isInteger(id) || id < 1) return res.status(400).json({ error: 'Invalid payment id.' });
+
+    const [payRows] = await query('SELECT * FROM payments WHERE id = ?', [id]);
+    if (!payRows.length) return res.status(404).json({ error: 'Payment record not found.' });
+    const payment = payRows[0];
+
+    const updates = [];
+    const params = [];
+    const admin = adminRef(req);
+
+    let status = payment.status;
+    if (req.body.status !== undefined) {
+      if (!MANUAL_STATUSES.includes(req.body.status)) {
+        return res.status(400).json({ error: `Status must be one of: ${MANUAL_STATUSES.join(', ')}.` });
+      }
+      status = req.body.status;
+      updates.push('status = ?');
+      params.push(status);
+
+      if (status === 'paid') {
+        // paid_at is what the receipt prints; keep the original where one of the
+        // gateway flows already stamped it.
+        updates.push('paid_at = COALESCE(paid_at, NOW())', 'confirmed_by = ?', 'confirmed_at = NOW()');
+        params.push(admin);
+      } else {
+        updates.push('paid_at = NULL', 'confirmed_by = NULL', 'confirmed_at = NULL');
+      }
+    }
+
+    if (req.body.amount !== undefined) {
+      const amount = Number(req.body.amount);
+      if (!Number.isFinite(amount) || amount <= 0) {
+        return res.status(400).json({ error: 'Enter an amount greater than zero.' });
+      }
+      updates.push('amount = ?');
+      params.push(amount);
+    }
+
+    if (req.body.payment_method !== undefined) {
+      if (!MANUAL_METHODS.includes(req.body.payment_method)) {
+        return res.status(400).json({ error: 'Invalid payment method.' });
+      }
+      updates.push('payment_method = ?');
+      params.push(req.body.payment_method);
+    }
+
+    if (req.body.admin_note !== undefined) {
+      updates.push('admin_note = ?');
+      params.push(req.body.admin_note ? String(req.body.admin_note).slice(0, 500) : null);
+    }
+
+    if (req.body.proof_url !== undefined) {
+      updates.push('proof_url = ?', 'proof_uploaded_at = NOW()');
+      params.push(req.body.proof_url ? String(req.body.proof_url).slice(0, 500) : null);
+    }
+
+    if (!updates.length) return res.status(400).json({ error: 'Nothing to update.' });
+
+    params.push(id);
+    await query(`UPDATE payments SET ${updates.join(', ')} WHERE id = ?`, params);
+
+    const totals = await syncRegistrantFinancials(payment.registrant_id);
+
+    await auditLog(
+      admin, 'PAYMENT_UPDATED', 'payments', id,
+      `${payment.status} → ${status}${req.body.admin_note ? ` — ${String(req.body.admin_note).slice(0, 200)}` : ''}`
+    );
+
+    // Only on the transition, so re-saving a note never re-sends a receipt.
+    if (status === 'paid' && payment.status !== 'paid') {
+      notifyPaymentConfirmed(payment.registrant_id, id);
+    }
+
+    return res.json({ id, status, ...totals });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // ─── GET /api/admin/export/csv ────────────────────────────────────────────────
 
 router.get('/export/csv', async (req, res, next) => {
@@ -358,7 +574,9 @@ router.get('/export/csv', async (req, res, next) => {
 
     const [rows] = await query(
       `SELECT r.registration_ref, r.designation, r.first_name, r.last_name,
-              r.email, r.phone, r.office, r.category, r.church, r.country,
+              r.email, r.phone,
+              IF(r.office = 'Other', COALESCE(NULLIF(r.office_other, ''), 'Other'), r.office) AS office,
+              r.category, r.church, r.country,
               r.accommodation, r.accommodation_nights, r.num_people, r.delegate_details,
               r.hotel_name, r.hotel_room_type, r.hotel_rooms,
               r.conference_total, r.hotel_total, r.grand_total,
@@ -399,7 +617,7 @@ router.get('/export/csv', async (req, res, next) => {
  *  document and the bulk report never drift apart. */
 const REGISTRATION_PDF_COLUMNS = `
   r.id, r.registration_ref, r.designation, r.first_name, r.last_name,
-  r.email, r.phone, r.office, r.category, r.church, r.country,
+  r.email, r.phone, r.office, r.office_other, r.category, r.church, r.country,
   r.accommodation, r.accommodation_nights, r.num_people, r.delegate_details,
   r.hotel_name, r.hotel_room_type, r.hotel_price_usd, r.hotel_rooms,
   r.conference_total, r.hotel_total, r.grand_total, r.amount_paid, r.balance_due,
@@ -741,9 +959,14 @@ router.delete('/award-categories/:id', async (req, res, next) => {
 router.get('/schedule', async (req, res, next) => {
   try {
     const { date } = req.query;
+    // session_date is formatted in SQL rather than returned as a DATE: mysql2
+    // parses DATE into a local-midnight Date, which serialises to the previous
+    // evening in UTC and re-dates every session by a day on the way out.
+    const columns = `id, DATE_FORMAT(session_date, '%Y-%m-%d') AS session_date,
+                     start_time, end_time, title, room, type, description, created_at, updated_at`;
     const [rows] = date
-      ? await query('SELECT * FROM schedule_sessions WHERE session_date=? ORDER BY start_time', [date])
-      : await query('SELECT * FROM schedule_sessions ORDER BY session_date, start_time');
+      ? await query(`SELECT ${columns} FROM schedule_sessions WHERE session_date=? ORDER BY start_time`, [date])
+      : await query(`SELECT ${columns} FROM schedule_sessions ORDER BY session_date, start_time`);
     res.json(rows);
   } catch (err) { next(err); }
 });
@@ -751,6 +974,9 @@ router.get('/schedule', async (req, res, next) => {
 router.post('/schedule', async (req, res, next) => {
   try {
     const { session_date, start_time, end_time, title, room, type, description } = req.body;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(session_date || ''))) {
+      return res.status(400).json({ error: 'session_date must be YYYY-MM-DD.' });
+    }
     const [result] = await query(
       `INSERT INTO schedule_sessions (session_date, start_time, end_time, title, room, type, description)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
@@ -763,9 +989,16 @@ router.post('/schedule', async (req, res, next) => {
 router.put('/schedule/:id', async (req, res, next) => {
   try {
     const { session_date, start_time, end_time, title, room, type, description } = req.body;
+    // A payload that omits the date must leave the session where it is. Writing
+    // NULL into a NOT NULL column used to move the session off its day entirely.
+    if (session_date !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(String(session_date))) {
+      return res.status(400).json({ error: 'session_date must be YYYY-MM-DD.' });
+    }
+    const dateClause = session_date === undefined ? '' : 'session_date=?, ';
+    const dateParam = session_date === undefined ? [] : [session_date];
     await query(
-      `UPDATE schedule_sessions SET session_date=?, start_time=?, end_time=?, title=?, room=?, type=?, description=? WHERE id=?`,
-      [session_date || null, start_time || null, end_time || null, title || '', room || '', type || 'general', description || '', req.params.id]
+      `UPDATE schedule_sessions SET ${dateClause}start_time=?, end_time=?, title=?, room=?, type=?, description=? WHERE id=?`,
+      [...dateParam, start_time || null, end_time || null, title || '', room || '', type || 'general', description || '', req.params.id]
     );
     res.json({ ok: true });
   } catch (err) { next(err); }
