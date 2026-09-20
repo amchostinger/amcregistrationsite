@@ -147,10 +147,33 @@ router.post('/', registrationLimiter, registrationValidation, async (req, res, n
     const registrant = await createRegistrant(req.body);
 
     // Fire notification emails (non-blocking — don't fail if email errors)
-    Promise.all([
-      emailService.sendRegistrationConfirmation(registrant),
-      emailService.sendAdminNewRegistrationNotification(registrant),
-    ]).catch((err) => console.error('[Email Error]', err.message));
+    emailService.sendRegistrationConfirmation(registrant)
+      .then(() => {
+        console.log('[Registration] Confirmation email sent', {
+          registration_ref: registrant.registration_ref,
+          email: registrant.email,
+        });
+      })
+      .catch((error) => {
+        console.error('[Registration] Confirmation email failed', {
+          registration_ref: registrant.registration_ref,
+          email: registrant.email,
+          error: error.message,
+        });
+      });
+
+    emailService.sendAdminNewRegistrationNotification(registrant)
+      .then(() => {
+        console.log('[Registration] Admin notification sent', {
+          registration_ref: registrant.registration_ref,
+        });
+      })
+      .catch((error) => {
+        console.error('[Registration] Admin notification failed', {
+          registration_ref: registrant.registration_ref,
+          error: error.message,
+        });
+      });
 
     return res.status(201).json({
       success: true,

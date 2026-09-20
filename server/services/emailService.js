@@ -10,10 +10,10 @@
 
 const { officeLabel } = require('./registrationService');
 
-const FROM = process.env.RESEND_FROM_EMAIL || 'AMC 2027 Conference <conference@amcconference2027.org>';
+const FROM = process.env.RESEND_FROM_EMAIL || 'AMC 2027 Conference <conference@africamethodistcouncil.org>';
 const ADMIN_EMAIL = process.env.ADMIN_NOTIFICATION_EMAIL || 'communications@africamethodistcouncil.org';
 const ARCHIVE_EMAIL = process.env.EMAIL_ARCHIVE_ADDRESS || 'communications@africamethodistcouncil.org';
-const REPLY_TO = process.env.EMAIL_REPLY_TO || 'communications@africamethodistcouncil.org';
+const REPLY_TO = process.env.EMAIL_REPLY_TO || 'conference@africamethodistcouncil.org';
 const CONFERENCE_TZ = 'Africa/Harare';
 
 // A placeholder key is worse than no key — it produces a live client that 401s
